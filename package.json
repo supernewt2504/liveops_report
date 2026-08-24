@@ -1,0 +1,13 @@
+{
+  "name": "game-ops-collector",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "collect": "node collect.mjs"
+  },
+  "dependencies": {
+    "app-store-scraper": "^0.18.0",
+    "google-play-scraper": "^10.1.3"
+  }
+}

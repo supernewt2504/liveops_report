@@ -1,0 +1,20 @@
+{
+  "country": "kr",
+  "lang": "ko",
+  "ranksSheetCsvUrl": "",
+  "reviewFetch": { "googleNum": 300, "applePages": 8 },
+  "projects": [
+    {
+      "id": "projectA",
+      "name": "부족또전쟁:무한루프RPG",
+      "google": "com.hkqs.jszx.google",
+      "apple": 6756254027,
+      "onestore": "0001007060",
+      "galaxy": "000009038539",
+      "galaxyGuid": "com.jszx.samsung",
+      "googleCategory": "GAME",
+      "appleCategory": "GAMES",
+      "categoryLabel": "게임 전체"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "_help": "자동 미수집 순위만 수동 입력. popular=인기, grossing=최고매출. 자동수집값이 있으면 자동이 우선. 갤럭시 인기는 자동수집됨 → grossing(최고매출)만 필요. 원스토어는 인기/매출 모두 수동.",
+  "galaxy": {
+    "2026-08-24": { "popular": null, "grossing": null }
+  },
+  "onestore": {
+    "2026-08-24": { "popular": null, "grossing": null }
+  }
+}
