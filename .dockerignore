@@ -1,0 +1,13 @@
+node_modules
+.git
+.venv
+.av
+*.log
+_*.html
+_*.mjs
+_*.py
+s.csv
+# 런타임 데이터·산출물은 볼륨(/data)에서 생성 — 이미지에 포함하지 않음
+data.json
+dashboard*.html
+.last-report

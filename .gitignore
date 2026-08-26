@@ -5,3 +5,12 @@ node_modules/
 s.csv
 _*.mjs
 _*.py
+.gameops-mail.json
+recipients.json
+
+_*.html
+
+# 런타임 데이터·빌드 산출물 (볼륨에서 생성 — git 추적 제외)
+data.json
+dashboard*.html
+.last-report

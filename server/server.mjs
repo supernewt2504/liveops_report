@@ -1,0 +1,55 @@
+// game-ops 리포트 서버 — 토큰 링크로 대시보드 열람 + 같은 컨테이너에서 일일 스케줄러 구동.
+//   GET /health            헬스체크
+//   GET /r/:proj?t=TOKEN   토큰이 맞으면 해당 프로젝트 대시보드 HTML 서빙 (&lang=zh 로 중문)
+import express from 'express';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
+import { startScheduler } from '../worker/scheduler.mjs';
+
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const DATA_DIR = process.env.DATA_DIR || ROOT;          // 대시보드 산출물 위치(볼륨)
+const TOKEN = process.env.REPORT_TOKEN || '';           // 리포트 열람 토큰
+
+const cfg = JSON.parse(readFileSync(path.join(ROOT, 'config.json'), 'utf8'));
+const PROJECTS = new Set((cfg.projects || []).map(p => p.id));
+const FIRST = (cfg.projects || [])[0]?.id;
+
+// 타이밍 공격 방지용 상수시간 토큰 비교
+function tokenOk(given) {
+  if (!TOKEN || !given) return false;
+  const a = Buffer.from(String(given));
+  const b = Buffer.from(TOKEN);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+const app = express();
+app.disable('x-powered-by');
+
+app.get('/health', (req, res) => res.json({ ok: true, projects: [...PROJECTS] }));
+
+app.get('/r/:proj', (req, res) => {
+  const { proj } = req.params;
+  if (!PROJECTS.has(proj)) return res.status(404).send('알 수 없는 프로젝트입니다.');
+  if (!tokenOk(req.query.t)) return res.status(401).send('접근 토큰이 유효하지 않습니다.');
+
+  const base = proj === FIRST ? 'dashboard' : `dashboard-${proj}`;
+  const lang = req.query.lang === 'zh' ? '-zh' : '';
+  // 수신자 바 없는 web(-mail) 버전 우선, 없으면 폴백
+  const cands = [`${base}-mail${lang}.html`, `${base}${lang}.html`, `${base}-mail.html`, `${base}.html`];
+  const file = cands.map(f => path.join(DATA_DIR, f)).find(existsSync);
+  if (!file) return res.status(503).send('아직 리포트가 생성되지 않았습니다. 잠시 후 다시 시도해 주세요.');
+
+  res.set('Cache-Control', 'no-store');
+  res.sendFile(file);
+});
+
+app.get('/', (req, res) => res.status(200).send('game-ops report server'));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✓ game-ops report server on :${PORT}`);
+  if (!TOKEN) console.warn('⚠ REPORT_TOKEN 미설정 — 모든 리포트 요청이 401 처리됩니다. 환경변수를 설정하세요.');
+  if (!process.env.NO_WORKER) startScheduler();     // 같은 컨테이너에서 스케줄러 동시 구동
+});

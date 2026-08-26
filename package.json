@@ -4,10 +4,16 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "start": "node server/server.mjs",
+    "worker": "node worker/scheduler.mjs",
+    "run:once": "node lib/pipeline.mjs",
     "collect": "node collect.mjs"
   },
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "app-store-scraper": "^0.18.0",
-    "google-play-scraper": "^10.1.3"
+    "express": "^4.22.2",
+    "google-play-scraper": "^10.1.3",
+    "nodemailer": "^9.0.5"
   }
 }

@@ -7,14 +7,32 @@
     {
       "id": "projectA",
       "name": "부족또전쟁:무한루프RPG",
+      "nameZh": "决胜之心",
       "google": "com.hkqs.jszx.google",
       "apple": 6756254027,
       "onestore": "0001007060",
       "galaxy": "000009038539",
       "galaxyGuid": "com.jszx.samsung",
+      "lounge": "Heart_of_Valor",
       "googleCategory": "GAME",
       "appleCategory": "GAMES",
       "categoryLabel": "게임 전체"
+    },
+    {
+      "id": "projectB",
+      "name": "소년가행:강호의시작",
+      "nameZh": "少年歌行:江湖启程",
+      "google": "com.dreamplay.greatjt.google",
+      "apple": 6768501839,
+      "onestore": "OA01006488",
+      "onestorePackage": "com.dreamplay.greatjt.onestore",
+      "applePackage": "com.dreamplay.greatjt.apple",
+      "lounge": "TheBloodofYouth",
+      "googleCategory": "GAME",
+      "appleCategory": "GAMES",
+      "categoryLabel": "게임 전체",
+      "preLaunch": true,
+      "excludeStores": ["galaxy"]
     }
   ]
 }
