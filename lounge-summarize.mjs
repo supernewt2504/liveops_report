@@ -24,11 +24,13 @@ const SYSTEM = `당신은 게임 운영 애널리스트입니다. 네이버 라�
 {
   "gist": { "ko": "2~3문장 여론 요약(활발한 주제·불만·건의 중심)", "zh": "위 내용의 중국어 번역" },
   "topics": [ { "name": {"ko":"주제명","zh":"中文"}, "note": {"ko":"한줄 설명","zh":"中文"}, "tone": "pos|neg|neu" } ],
+  "boards": { "게시판ID(입력에 준 boardId 숫자를 문자열로)": {"ko":"그 게시판 최근 글 활동 1줄 요약","zh":"中文"} },
   "events": [ { "feedId": <입력 이벤트의 feedId 숫자>, "start": "YYYY-MM-DD 또는 null", "end": "YYYY-MM-DD 또는 null", "period": {"ko":"쿠폰 사용 ~8/29(토) 같은 짧은 기간표기","zh":"中文"}, "title": {"ko":"이벤트 짧은 제목","zh":"中文"}, "content": {"ko":"1~2문장 핵심 요약","zh":"中文"}, "url": "<입력 이벤트의 url>" } ]
 }
 
 규칙:
 - topics는 3~5개. 가장 활발하거나 운영상 중요한 주제 위주. tone은 긍정(pos)/부정(neg)/중립(neu).
+- boards는 입력의 [boardId N · ...] 로 표시된 각 게시판마다 1줄 요약(그 게시판 최근 글의 성격·주요 내용). 키는 그 boardId 숫자를 문자열로("1","3" 등). 입력에 나온 모든 게시판을 포함.
 - events는 입력으로 준 이벤트만 대상. 본문에서 이벤트 기간(시작·종료일)을 찾아 start/end(YYYY-MM-DD)와 period 표기를 만들고, 제목·내용을 한/중 간결히. 기간을 못 찾으면 start/end는 null.
 - 모든 텍스트는 운영 보고 톤. 과장 없이 사실 위주.`;
 
@@ -40,7 +42,7 @@ function buildInput(lo) {
     const posts = (bf.recent || []).slice(0, 8);
     postCount += posts.length;
     const lines = posts.map(f => `- ${f.title} (댓글 ${f.commentCount || 0}·조회 ${f.readCount || 0}·${f.createdKst})`);
-    if (lines.length) boardLines.push(`[${bf.group} · ${bf.name}]\n${lines.join('\n')}`);
+    if (lines.length) boardLines.push(`[boardId ${bf.boardId} · ${bf.group} · ${bf.name}]\n${lines.join('\n')}`);
   }
   const events = (lo.events || []).map(e => ({ feedId: e.feedId, url: e.url, createdKst: e.createdKst,
     block: `feedId: ${e.feedId}\nurl: ${e.url}\ncreatedKst: ${e.createdKst}\n제목: ${e.title}\n본문: ${e.detailText}` }));
@@ -79,7 +81,7 @@ async function summarizeProject(projId) {
   for (const ev of (out.events || [])) if (byId[String(ev.feedId)]) ev.url = byId[String(ev.feedId)];
 
   days[latest].lounge.summary = {
-    gist: out.gist, topics: out.topics || [], boards: lo.boards?.length || 0, events: out.events || [],
+    gist: out.gist, topics: out.topics || [], boards: out.boards || {}, events: out.events || [],
     generatedAt: new Date().toISOString(), model: MODEL, basedOn: postCount + events.length,
   };
   console.log(`  ✓ [${projId}] 라운지 요약 생성 (${latest}, 분석 ${postCount + events.length}건, 이벤트 ${(out.events || []).length}개)`);

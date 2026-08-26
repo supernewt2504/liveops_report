@@ -329,6 +329,7 @@ async function fetchSheetRanks(url) {
   const POP = ['人气', '인기'], GRS = ['畅销', '매출'];
   const cOnePop = findCol(['OneStore', '원스토어', 'ONE'], POP);
   const cOneGrs = findCol(['OneStore', '원스토어', 'ONE'], GRS);
+  const cGalPop = findCol(['Galaxy', '갤럭시'], POP);   // 갤럭시 인기(자동수집 실패 시 보완)
   const cGalGrs = findCol(['Galaxy', '갤럭시'], GRS);
   const cell = (r, ci) => (ci >= 0 && ci < r.length) ? r[ci] : '';
   const out = { onestore: {}, galaxy: {} };
@@ -336,8 +337,8 @@ async function fetchSheetRanks(url) {
     const date = normDate(r[0]); if (!date) continue;
     const op = parseRankCell(cell(r, cOnePop)), og = parseRankCell(cell(r, cOneGrs));
     if (op !== undefined || og !== undefined) out.onestore[date] = { popular: op, grossing: og };
-    const gg = parseRankCell(cell(r, cGalGrs));
-    if (gg !== undefined) out.galaxy[date] = { grossing: gg };
+    const gp = parseRankCell(cell(r, cGalPop)), gg = parseRankCell(cell(r, cGalGrs));
+    if (gp !== undefined || gg !== undefined) out.galaxy[date] = { popular: gp, grossing: gg };
   }
   return out;
 }
@@ -355,12 +356,13 @@ function applyRanks(db, ranks, targetId) {
     if (v.popular !== undefined) s.rankFree = v.popular;
     if (v.grossing !== undefined) s.rankGrossing = v.grossing;
   }
-  // 갤럭시: 매출만 (인기는 자동수집 유지)
+  // 갤럭시: 매출은 시트, 인기는 자동수집 우선(있으면 유지)·실패 시(클라우드 등) 시트값으로 보완
   for (const [date, v] of Object.entries(ranks.galaxy || {})) {
-    if (!v || v.grossing === undefined) continue;
+    if (!v) continue;
     proj.days[date] ??= { stores: {} };
     const s = (proj.days[date].stores.galaxy ??= { metricsOnly: true });
-    s.rankGrossing = v.grossing;
+    if (v.grossing !== undefined) s.rankGrossing = v.grossing;
+    if (v.popular !== undefined && s.rankFree == null) s.rankFree = v.popular;
   }
 }
 // 지표 전용 스토어: 오늘자 스냅샷에 평점 등 기록 (리뷰/순위 없음)
