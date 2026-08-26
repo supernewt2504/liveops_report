@@ -7,6 +7,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import { startScheduler } from '../worker/scheduler.mjs';
+import { runPipeline } from '../lib/pipeline.mjs';
+import { backupToDrive, driveEnabled } from '../lib/gdrive-backup.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = process.env.DATA_DIR || ROOT;          // 대시보드 산출물 위치(볼륨)
@@ -43,6 +45,22 @@ app.get('/r/:proj', (req, res) => {
 
   res.set('Cache-Control', 'no-store');
   res.sendFile(file);
+});
+
+// ---- 관리용 수동 트리거 (토큰 필요) ----
+// 드라이브 백업만 즉시 실행 (data.json·대시보드가 이미 있어야 함)
+app.get('/admin/backup', async (req, res) => {
+  if (!tokenOk(req.query.t)) return res.status(401).json({ error: 'unauthorized' });
+  if (!driveEnabled()) return res.status(400).json({ ok: false, error: 'GOOGLE_SERVICE_ACCOUNT_JSON/GDRIVE_FOLDER_ID 미설정' });
+  try { await backupToDrive(); res.json({ ok: true, msg: '백업 완료 (상세는 Deploy Logs 참고)' }); }
+  catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+// 전체 파이프라인 수동 실행 (기본 메일 발송, ?mail=0 이면 생략). 즉시 응답 후 백그라운드 실행.
+app.get('/admin/run', (req, res) => {
+  if (!tokenOk(req.query.t)) return res.status(401).json({ error: 'unauthorized' });
+  const mail = req.query.mail !== '0';
+  res.json({ ok: true, started: true, mail, msg: '파이프라인 시작 (진행상황은 Deploy Logs 참고)' });
+  runPipeline({ mail }).catch(e => console.error('✗ admin/run 실패:', e.message));
 });
 
 app.get('/', (req, res) => res.status(200).send('game-ops report server'));
