@@ -59,8 +59,9 @@ app.get('/admin/backup', async (req, res) => {
 app.get('/admin/run', (req, res) => {
   if (!tokenOk(req.query.t)) return res.status(401).json({ error: 'unauthorized' });
   const mail = req.query.mail !== '0';
-  res.json({ ok: true, started: true, mail, msg: '파이프라인 시작 (진행상황은 Deploy Logs 참고)' });
-  runPipeline({ mail }).catch(e => console.error('✗ admin/run 실패:', e.message));
+  const testTo = req.query.to ? String(req.query.to) : null;   // 지정 시 그 주소로만 발송(테스트)
+  res.json({ ok: true, started: true, mail, testTo, msg: '파이프라인 시작 (진행상황은 Deploy Logs 참고)' });
+  runPipeline({ mail, testTo }).catch(e => console.error('✗ admin/run 실패:', e.message));
 });
 
 app.get('/', (req, res) => res.status(200).send('game-ops report server'));

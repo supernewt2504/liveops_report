@@ -48,6 +48,8 @@ try {
   else if (rj && typeof rj === 'object') for (const l of ['ko', 'zh']) if (Array.isArray(rj[l])) byLang[l] = rj[l].filter(e => /@/.test(e));
 } catch {}
 if (!byLang.ko.length && !byLang.zh.length && cred.to) byLang.ko = [cred.to];
+// 테스트 우회: MAIL_TEST_TO 가 있으면 운영 수신자 무시하고 그 주소로만 1통(한국어) 발송
+if (process.env.MAIL_TEST_TO) { byLang.ko = [process.env.MAIL_TEST_TO]; byLang.zh = []; console.log('🧪 테스트 발송 모드 →', process.env.MAIL_TEST_TO); }
 if (!byLang.ko.length && !byLang.zh.length) { console.error('✗ 수신자 없음'); process.exit(1); }
 
 // ================= 라벨/문구 사전 =================
