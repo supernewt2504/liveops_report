@@ -414,7 +414,9 @@ var SMC = {google:"#00875a",apple:"#4b5563",onestore:"#e5352b",galaxy:"#1d4ed8"}
 var SMS = {google:"G",apple:"◎",onestore:"1",galaxy:"S"};
 // 스토어 로고: 각 스토어에 노출 중인 앱 아이콘(임베드)이 있으면 이미지, 없으면 글자 배지
 function logoHtml(k){
-  var ic=(REAL.icons||{})[k];
+  var ics=REAL.icons||{};
+  // 같은 게임이라 스토어별 아이콘이 없으면 대표 아이콘(구글→애플→원스토어)으로 폴백
+  var ic=ics[k]||ics.google||ics.apple||ics.onestore;
   return ic ? '<img class="logo-img" src="'+ic+'" alt="">'
             : '<span class="logo" style="background:'+SMC[k]+'">'+SMS[k]+'</span>';
 }
