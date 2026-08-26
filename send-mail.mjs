@@ -73,6 +73,7 @@ const T = {
     boardNames: { '자유 게시판': '자유 게시판', '버그 제보': '버그 제보', '질문&답변': '질문&답변', '건의사항': '건의사항', '공략 & TIP': '공략 & TIP' },
     topics: { '칭찬': '칭찬', '콘텐츠': '콘텐츠', '계정/로그인': '계정/로그인', '과금': '과금', '뽑기/확률': '뽑기/확률', '버그/접속': '버그/접속', '편의성': '편의성', '보상/리워드': '보상/리워드', '기타': '기타', '미분류': '미분류' },
     viewWeb: '웹에서 리포트 보기',
+    viewWebSub: '버튼을 누르면 웹에서 전체 지표·리뷰·라운지 여론(일간/주간·한/중)을 확인할 수 있습니다.',
     linkbox: '📎 상세 지표·리뷰·라운지 여론은 <b>첨부된 대시보드 HTML</b>을 브라우저로 열어 확인해 주세요.',
     foot: '자동 발송 · 부족또전쟁 운영 대시보드 파이프라인',
     leadW: (a, b, c, d) => `지난주 원스토어 순위는 인기 ${a}·매출 ${b}에서 시작해 주말에는 <b>인기 ${c}·매출 ${d}</b>를 기록했습니다. 구글·애플은 순위권 밖을 유지했습니다.`,
@@ -104,6 +105,7 @@ const T = {
     boardNames: { '자유 게시판': '自由板', '버그 제보': 'BUG反馈', '질문&답변': '问答', '건의사항': '建议', '공략 & TIP': '攻略&TIP' },
     topics: { '칭찬': '好评', '콘텐츠': '内容', '계정/로그인': '账号/登录', '과금': '付费', '뽑기/확률': '抽卡/概率', '버그/접속': 'BUG/连接', '편의성': '易用性', '보상/리워드': '奖励', '기타': '其他', '미분류': '未分类' },
     viewWeb: '在网页查看报告',
+    viewWebSub: '点击按钮即可在网页查看完整指标·评论·论坛舆情(日报/周报·中/韩)。',
     linkbox: '📎 详细指标·评论·论坛舆情请打开<b>附件仪表板 HTML</b>查看。',
     foot: '自动发送 · 决胜之心 运营仪表板流程',
     leadW: (a, b, c, d) => `上周 ONE Store 排名从人气 ${a}·畅销 ${b} 开始，周末为 <b>人气 ${c}·畅销 ${d}</b>。Google·Apple 维持在榜单外。`,
@@ -142,7 +144,7 @@ async function buildReport(lang) {
   const webLink = (REPORT_BASE && REPORT_TOKEN)
     ? `${REPORT_BASE}/r/${projId}?t=${encodeURIComponent(REPORT_TOKEN)}${lang === 'zh' ? '&lang=zh' : ''}` : null;
   const linkbox = webLink
-    ? `<div style="margin:20px 0 6px"><a href="${webLink}" style="display:inline-block;background:${STORE.col};color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">${L.viewWeb} →</a><div style="margin-top:9px;color:${C.ink3};font-size:12px">${L.linkbox}</div></div>`
+    ? `<div style="margin:20px 0 6px"><a href="${webLink}" style="display:inline-block;background:${STORE.col};color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">${L.viewWeb} →</a><div style="margin-top:9px;color:${C.ink3};font-size:12px">${L.viewWebSub}</div></div>`
     : `<div style="margin:20px 0 6px;padding:11px 14px;background:${C.bg};border-radius:8px;color:${C.ink2};font-size:13px">${L.linkbox}</div>`;
   const foot = `<div style="color:#9aa4b2;font-size:11px;border-top:1px solid ${C.bd};padding-top:10px;margin-top:16px">${L.foot}</div>`;
 
@@ -196,10 +198,14 @@ async function buildReport(lang) {
     return sub(L.subEvents) + evHtml + sub(L.subUser) + userHtml;
   };
 
-  // 첨부는 수신자 바가 없는 mail 버전(대상자 목록 비노출). 언어별 파일, 없으면 폴백.
-  const cand = lang === 'zh' ? ['dashboard-mail-zh.html', 'dashboard-mail.html', 'dashboard.html'] : ['dashboard-mail.html', 'dashboard.html'];
-  const dashFile = cand.find(f => existsSync(join(DATA_DIR, f))) || 'dashboard.html';
-  const attachments = [{ filename: `${L.game}_dashboard_${allDates[allDates.length - 1]}.html`, path: join(DATA_DIR, dashFile), contentType: 'text/html' }];
+  // 웹 리포트 링크가 있으면 HTML 첨부는 생략(링크로 대체). 없을 때만 대시보드 HTML을 첨부.
+  const webLinkOn = !!(REPORT_BASE && REPORT_TOKEN);
+  const attachments = [];
+  if (!webLinkOn) {
+    const cand = lang === 'zh' ? ['dashboard-mail-zh.html', 'dashboard-mail.html', 'dashboard.html'] : ['dashboard-mail.html', 'dashboard.html'];
+    const dashFile = cand.find(f => existsSync(join(DATA_DIR, f))) || 'dashboard.html';
+    attachments.push({ filename: `${L.game}_dashboard_${allDates[allDates.length - 1]}.html`, path: join(DATA_DIR, dashFile), contentType: 'text/html' });
+  }
   let chartPng = null;
   const latest = allDates[allDates.length - 1];
   const isMonday = new Date(latest).getUTCDay() === 1;
