@@ -272,13 +272,23 @@ if (process.env.MAIL_DRYRUN) {
 }
 
 const { default: nodemailer } = await import('nodemailer');
-// family:4 → 일부 클라우드(예: Railway)는 IPv6 미지원이라 Gmail IPv6 연결이 ENETUNREACH로 실패함. IPv4 강제.
-// *Timeout → 연결 실패 시 2분씩 매달리지 않고 빠르게 실패.
-const tp = nodemailer.createTransport({
-  host: 'smtp.gmail.com', port: 465, secure: true, family: 4,
-  connectionTimeout: 20000, greetingTimeout: 20000, socketTimeout: 30000,
-  auth: { user, pass },
+// family:4 → IPv6 미지원 클라우드에서 IPv6 연결 실패(ENETUNREACH) 회피. IPv4 강제.
+// 465(SMTPS)가 막힌 환경이 있어 465 → 587(STARTTLS) 순으로 연결 검증 후 가능한 포트 사용.
+const mkTransport = cfg => nodemailer.createTransport({
+  host: 'smtp.gmail.com', family: 4,
+  connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000,
+  auth: { user, pass }, ...cfg,
 });
+const PORT_CFGS = [
+  { port: 465, secure: true },
+  { port: 587, secure: false, requireTLS: true },
+];
+let tp = null;
+for (const cfg of PORT_CFGS) {
+  try { const t = mkTransport(cfg); await t.verify(); tp = t; console.log(`✓ SMTP 연결 성공 (포트 ${cfg.port})`); break; }
+  catch (e) { console.error(`✗ SMTP 포트 ${cfg.port} 실패: ${e.message}`); }
+}
+if (!tp) { console.error('✗ 모든 SMTP 포트(465/587) 연결 실패 — 네트워크에서 아웃바운드 SMTP 차단 가능성. 이메일 API 전환 필요.'); process.exit(1); }
 let sent = 0, failed = 0;
 for (const j of jobs) {
   const r = await buildReport(j.lang);
