@@ -7,6 +7,7 @@ import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
+import { gmailApiEnabled, gmailSend, gmailSender } from './lib/gmail-send.mjs';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 // 런타임 데이터·대시보드 산출물 위치 (클라우드=/data 볼륨, 로컬=코드 디렉터리)
@@ -16,19 +17,24 @@ const FROM_NAME = { ko: '부족또전쟁 운영팀', zh: '决胜之心 运营团
 const REPORT_BASE = (process.env.REPORT_BASE_URL || '').replace(/\/$/, '');
 const REPORT_TOKEN = process.env.REPORT_TOKEN || '';
 
-// 자격증명: 환경변수(클라우드) 우선, 없으면 로컬 ~/.gameops-mail.json
+// 발송 방식: Gmail API(서비스계정 위임) 우선 — Railway가 SMTP 차단 시. 아니면 SMTP(로컬).
+const USE_GMAIL_API = gmailApiEnabled();
 const credPath = join(homedir(), '.gameops-mail.json');
-let cred;
+let cred = {};
 if (process.env.MAIL_USER && process.env.MAIL_APP_PASSWORD) {
   cred = { user: process.env.MAIL_USER, appPassword: process.env.MAIL_APP_PASSWORD, to: process.env.MAIL_TO || '' };
 } else if (existsSync(credPath)) {
   cred = JSON.parse(readFileSync(credPath, 'utf8'));
-} else {
-  console.log('⚠ 메일 자격증명 없음(MAIL_USER/MAIL_APP_PASSWORD 또는 ~/.gameops-mail.json) → 발송 건너뜀.');
-  process.exit(0);
 }
-const user = cred.user, pass = (cred.appPassword || '').replace(/\s/g, '');
-if (!user || !pass) { console.error('✗ 자격증명 불완전'); process.exit(1); }
+// 발신 주소: Gmail API 모드=GMAIL_SENDER, SMTP 모드=cred.user
+const user = USE_GMAIL_API ? gmailSender() : cred.user;
+const pass = (cred.appPassword || '').replace(/\s/g, '');
+if (!USE_GMAIL_API) {
+  if (!user || !pass) {
+    console.log('⚠ 메일 자격증명 없음(Gmail API용 GOOGLE_SERVICE_ACCOUNT_JSON+GMAIL_SENDER, 또는 SMTP용 MAIL_USER+MAIL_APP_PASSWORD) → 발송 건너뜀.');
+    process.exit(0);
+  }
+}
 
 const db = JSON.parse(readFileSync(join(DATA_DIR, 'data.json'), 'utf8'));
 const projId = Object.keys(db.projects)[0];
@@ -271,30 +277,34 @@ if (process.env.MAIL_DRYRUN) {
   process.exit(0);
 }
 
-const { default: nodemailer } = await import('nodemailer');
-// family:4 → IPv6 미지원 클라우드에서 IPv6 연결 실패(ENETUNREACH) 회피. IPv4 강제.
-// 465(SMTPS)가 막힌 환경이 있어 465 → 587(STARTTLS) 순으로 연결 검증 후 가능한 포트 사용.
-const mkTransport = cfg => nodemailer.createTransport({
-  host: 'smtp.gmail.com', family: 4,
-  connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000,
-  auth: { user, pass }, ...cfg,
-});
-const PORT_CFGS = [
-  { port: 465, secure: true },
-  { port: 587, secure: false, requireTLS: true },
-];
-let tp = null;
-for (const cfg of PORT_CFGS) {
-  try { const t = mkTransport(cfg); await t.verify(); tp = t; console.log(`✓ SMTP 연결 성공 (포트 ${cfg.port})`); break; }
-  catch (e) { console.error(`✗ SMTP 포트 ${cfg.port} 실패: ${e.message}`); }
+// 발송 함수: Gmail API 모드면 HTTP 발송, 아니면 SMTP(465→587 폴백).
+let sendOne;
+if (USE_GMAIL_API) {
+  console.log('✉ 발송 방식: Gmail API (서비스계정 위임) →', user);
+  sendOne = msg => gmailSend(msg);
+} else {
+  const { default: nodemailer } = await import('nodemailer');
+  // family:4 → IPv6 미지원 환경 회피. 465(SMTPS)→587(STARTTLS) 순으로 연결 검증.
+  const mkTransport = cfg => nodemailer.createTransport({
+    host: 'smtp.gmail.com', family: 4,
+    connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000,
+    auth: { user, pass }, ...cfg,
+  });
+  let tp = null;
+  for (const cfg of [{ port: 465, secure: true }, { port: 587, secure: false, requireTLS: true }]) {
+    try { const t = mkTransport(cfg); await t.verify(); tp = t; console.log(`✓ SMTP 연결 성공 (포트 ${cfg.port})`); break; }
+    catch (e) { console.error(`✗ SMTP 포트 ${cfg.port} 실패: ${e.message}`); }
+  }
+  if (!tp) { console.error('✗ 모든 SMTP 포트(465/587) 연결 실패 — 아웃바운드 SMTP 차단. Gmail API(GMAIL_SENDER) 사용 권장.'); process.exit(1); }
+  sendOne = msg => tp.sendMail(msg);
 }
-if (!tp) { console.error('✗ 모든 SMTP 포트(465/587) 연결 실패 — 네트워크에서 아웃바운드 SMTP 차단 가능성. 이메일 API 전환 필요.'); process.exit(1); }
+
 let sent = 0, failed = 0;
 for (const j of jobs) {
   const r = await buildReport(j.lang);
   try {
-    // 받는사람=발송계정(자기 자신), 실제 수신자는 전부 숨은참조(BCC) → 수령자끼리 목록 비노출
-    await tp.sendMail({ from: `${FROM_NAME[j.lang]} <${user}>`, to: `${FROM_NAME[j.lang]} <${user}>`, bcc: j.to, subject: r.subject, html: r.html, attachments: r.attachments });
+    // 받는사람=발신주소(자기 자신), 실제 수신자는 전부 숨은참조(BCC) → 수령자끼리 목록 비노출
+    await sendOne({ from: `${FROM_NAME[j.lang]} <${user}>`, to: `${FROM_NAME[j.lang]} <${user}>`, bcc: j.to, subject: r.subject, html: r.html, attachments: r.attachments });
     console.log(`✉ [${j.lang}] 발송 완료 → BCC: ${j.to}\n   (${r.subject})`); sent++;
   } catch (e) {
     console.error(`✗ [${j.lang}] 발송 실패: ${e.message}`); failed++;

@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
-const dbPath = join(DIR, 'data.json');
+const DATA_DIR = process.env.DATA_DIR || DIR;   // 볼륨(/data)의 data.json 사용
+const dbPath = join(DATA_DIR, 'data.json');
 const db = JSON.parse(readFileSync(dbPath, 'utf8'));
 
 const TOPICS = ['칭찬', '콘텐츠', '계정/로그인', '과금', '뽑기/확률', '버그/접속', '편의성', '보상/리워드', '기타'];
