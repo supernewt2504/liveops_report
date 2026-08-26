@@ -272,10 +272,23 @@ if (process.env.MAIL_DRYRUN) {
 }
 
 const { default: nodemailer } = await import('nodemailer');
-const tp = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user, pass } });
+// family:4 → 일부 클라우드(예: Railway)는 IPv6 미지원이라 Gmail IPv6 연결이 ENETUNREACH로 실패함. IPv4 강제.
+// *Timeout → 연결 실패 시 2분씩 매달리지 않고 빠르게 실패.
+const tp = nodemailer.createTransport({
+  host: 'smtp.gmail.com', port: 465, secure: true, family: 4,
+  connectionTimeout: 20000, greetingTimeout: 20000, socketTimeout: 30000,
+  auth: { user, pass },
+});
+let sent = 0, failed = 0;
 for (const j of jobs) {
   const r = await buildReport(j.lang);
-  // 받는사람=발송계정(자기 자신), 실제 수신자는 전부 숨은참조(BCC) → 수령자끼리 목록 비노출
-  await tp.sendMail({ from: `${FROM_NAME[j.lang]} <${user}>`, to: `${FROM_NAME[j.lang]} <${user}>`, bcc: j.to, subject: r.subject, html: r.html, attachments: r.attachments });
-  console.log(`✉ [${j.lang}] 발송 완료 → BCC: ${j.to}\n   (${r.subject})`);
+  try {
+    // 받는사람=발송계정(자기 자신), 실제 수신자는 전부 숨은참조(BCC) → 수령자끼리 목록 비노출
+    await tp.sendMail({ from: `${FROM_NAME[j.lang]} <${user}>`, to: `${FROM_NAME[j.lang]} <${user}>`, bcc: j.to, subject: r.subject, html: r.html, attachments: r.attachments });
+    console.log(`✉ [${j.lang}] 발송 완료 → BCC: ${j.to}\n   (${r.subject})`); sent++;
+  } catch (e) {
+    console.error(`✗ [${j.lang}] 발송 실패: ${e.message}`); failed++;
+  }
 }
+console.log(`발송 결과: 성공 ${sent} · 실패 ${failed}`);
+if (sent === 0 && failed > 0) process.exit(1);
