@@ -10,6 +10,7 @@
     "collect": "node collect.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
     "@resvg/resvg-js": "^2.6.2",
     "app-store-scraper": "^0.18.0",
     "express": "^4.22.2",
