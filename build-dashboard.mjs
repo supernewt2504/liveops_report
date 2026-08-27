@@ -647,15 +647,15 @@ function renderCS(L){
   sec.style.display="";
   document.getElementById("csH").textContent=L.csH;
   document.getElementById("csHint").textContent=L.csHint;
-  var created=csSum(csPeriodDates(),'created'), resolved=csSum(csPeriodDates(),'resolved');
-  var ppd=csPrevPeriodDates();
-  var pC=ppd?csSum(ppd,'created'):null, pR=ppd?csSum(ppd,'resolved'):null;
+  // KPI는 섹션 취지(최근 30일)·요약과 일치하도록 30일 전체 합계. 차트는 일자별 표시.
+  var created=(REAL.cs.daily||[]).reduce(function(s,d){return s+(d.created||0);},0);
+  var resolved=(REAL.cs.daily||[]).reduce(function(s,d){return s+(d.resolved||0);},0);
   var byStatus=REAL.cs.byStatus||{}, byCat=REAL.cs.byCategory||{};
   var TERM={"처리완료":1,"처리불가":1};
   var pending=Object.keys(byStatus).reduce(function(s,k){return s+(TERM[k]?0:byStatus[k]);},0);
   var kpi='<div class="lounge-kpi">'+
-    '<div class="lk"><span class="k">'+L.csKInquiry+'</span><span class="v"><span class="num">'+created+'</span><span class="unit">'+L.unitCnt+'</span>'+dchip(neuDelta(created,pC))+'</span></div>'+
-    '<div class="lk"><span class="k">'+L.csKResolved+'</span><span class="v"><span class="num good">'+resolved+'</span><span class="unit">'+L.unitCnt+'</span>'+dchip(neuDelta(resolved,pR))+'</span></div>'+
+    '<div class="lk"><span class="k">'+L.csKInquiry+'</span><span class="v"><span class="num">'+created+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
+    '<div class="lk"><span class="k">'+L.csKResolved+'</span><span class="v"><span class="num good">'+resolved+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
     '<div class="lk"><span class="k">'+L.csKPending+'</span><span class="v"><span class="num'+(pending>0?' warn':'')+'">'+pending+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
     '</div>';
   var sum=REAL.cs.summary, sumHtml;
