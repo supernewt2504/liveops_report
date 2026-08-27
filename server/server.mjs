@@ -33,6 +33,9 @@ app.get('/health', (req, res) => res.json({ ok: true, projects: [...PROJECTS] })
 
 // 짧은 코드(a,b,c…) ↔ 프로젝트 매핑. 정식 projId도 그대로 허용.
 const CProjects = cfg.projects || [];
+// 비밀 슬러그 → projId 매핑 (게임별 고유 비밀 경로. 이걸로 접근하면 토큰 불필요·게임별 분리)
+const SLUGS = {};
+for (const p of CProjects) if (p.slug) SLUGS[p.slug] = p.id;
 function resolveProj(code) {
   if (PROJECTS.has(code)) return code;
   const idx = { a: 0, b: 1, c: 2, d: 3 }[String(code).toLowerCase()];
@@ -47,14 +50,17 @@ function serveReport(projId, req, res) {
   res.set('Cache-Control', 'no-store');
   res.sendFile(file);
 }
-
-// /r/:proj (기존) + /a, /b (짧은 경로) 모두 지원
-app.get('/r/:proj', (req, res) => {
-  const projId = resolveProj(req.params.proj);
-  if (!projId) return res.status(404).send('알 수 없는 프로젝트입니다.');
+// 리포트 접근: ①비밀 슬러그(토큰 불필요, 게임별 분리) ②짧은코드/projId(토큰 필요, 내부/하위호환)
+function handleReport(key, req, res, next) {
+  if (SLUGS[key]) return serveReport(SLUGS[key], req, res);          // 비밀 슬러그 → 그 게임만
+  const projId = resolveProj(key);
+  if (!projId) return next ? next() : res.status(404).send('알 수 없는 경로입니다.');
   if (!tokenOk(req.query.t)) return res.status(401).send('접근 토큰이 유효하지 않습니다.');
   serveReport(projId, req, res);
-});
+}
+
+// /r/:key (슬러그 또는 proj) + 최상위 /:key (아래) 지원
+app.get('/r/:key', (req, res) => handleReport(req.params.key, req, res, null));
 
 // ---- 관리용 수동 트리거 (토큰 필요) ----
 // 드라이브 백업만 즉시 실행 (data.json·대시보드가 이미 있어야 함)
@@ -73,13 +79,8 @@ app.get('/admin/run', (req, res) => {
   runPipeline({ mail, testTo }).catch(e => console.error('✗ admin/run 실패:', e.message));
 });
 
-// 짧은 최상위 경로: /a?t=…  /b?t=…  (알 수 없는 코드는 통과 → 404)
-app.get('/:code', (req, res, next) => {
-  const projId = resolveProj(req.params.code);
-  if (!projId) return next();
-  if (!tokenOk(req.query.t)) return res.status(401).send('접근 토큰이 유효하지 않습니다.');
-  serveReport(projId, req, res);
-});
+// 최상위 경로: /jszx-… (비밀 슬러그) · /a · /b (알 수 없으면 통과 → 404)
+app.get('/:key', (req, res, next) => handleReport(req.params.key, req, res, next));
 
 app.get('/', (req, res) => res.status(200).send('game-ops report server'));
 

@@ -6,6 +6,7 @@
   "projects": [
     {
       "id": "projectA",
+      "slug": "jszx-Ym_sEQEc",
       "name": "부족또전쟁:무한루프RPG",
       "nameZh": "决胜之心",
       "google": "com.hkqs.jszx.google",
@@ -22,6 +23,7 @@
     },
     {
       "id": "projectB",
+      "slug": "syg-jrHFToCb",
       "name": "소년가행:강호의시작",
       "nameZh": "少年歌行:江湖启程",
       "google": "com.dreamplay.greatjt.google",
