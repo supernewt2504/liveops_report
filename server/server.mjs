@@ -31,20 +31,29 @@ app.disable('x-powered-by');
 
 app.get('/health', (req, res) => res.json({ ok: true, projects: [...PROJECTS] }));
 
-app.get('/r/:proj', (req, res) => {
-  const { proj } = req.params;
-  if (!PROJECTS.has(proj)) return res.status(404).send('알 수 없는 프로젝트입니다.');
-  if (!tokenOk(req.query.t)) return res.status(401).send('접근 토큰이 유효하지 않습니다.');
-
-  const base = proj === FIRST ? 'dashboard' : `dashboard-${proj}`;
+// 짧은 코드(a,b,c…) ↔ 프로젝트 매핑. 정식 projId도 그대로 허용.
+const CProjects = cfg.projects || [];
+function resolveProj(code) {
+  if (PROJECTS.has(code)) return code;
+  const idx = { a: 0, b: 1, c: 2, d: 3 }[String(code).toLowerCase()];
+  return idx != null ? (CProjects[idx]?.id || null) : null;
+}
+function serveReport(projId, req, res) {
+  const base = projId === FIRST ? 'dashboard' : `dashboard-${projId}`;
   const lang = req.query.lang === 'zh' ? '-zh' : '';
-  // 수신자 바 없는 web(-mail) 버전 우선, 없으면 폴백
   const cands = [`${base}-mail${lang}.html`, `${base}${lang}.html`, `${base}-mail.html`, `${base}.html`];
   const file = cands.map(f => path.join(DATA_DIR, f)).find(existsSync);
   if (!file) return res.status(503).send('아직 리포트가 생성되지 않았습니다. 잠시 후 다시 시도해 주세요.');
-
   res.set('Cache-Control', 'no-store');
   res.sendFile(file);
+}
+
+// /r/:proj (기존) + /a, /b (짧은 경로) 모두 지원
+app.get('/r/:proj', (req, res) => {
+  const projId = resolveProj(req.params.proj);
+  if (!projId) return res.status(404).send('알 수 없는 프로젝트입니다.');
+  if (!tokenOk(req.query.t)) return res.status(401).send('접근 토큰이 유효하지 않습니다.');
+  serveReport(projId, req, res);
 });
 
 // ---- 관리용 수동 트리거 (토큰 필요) ----
@@ -62,6 +71,14 @@ app.get('/admin/run', (req, res) => {
   const testTo = req.query.to ? String(req.query.to) : null;   // 지정 시 그 주소로만 발송(테스트)
   res.json({ ok: true, started: true, mail, testTo, msg: '파이프라인 시작 (진행상황은 Deploy Logs 참고)' });
   runPipeline({ mail, testTo }).catch(e => console.error('✗ admin/run 실패:', e.message));
+});
+
+// 짧은 최상위 경로: /a?t=…  /b?t=…  (알 수 없는 코드는 통과 → 404)
+app.get('/:code', (req, res, next) => {
+  const projId = resolveProj(req.params.code);
+  if (!projId) return next();
+  if (!tokenOk(req.query.t)) return res.status(401).send('접근 토큰이 유효하지 않습니다.');
+  serveReport(projId, req, res);
 });
 
 app.get('/', (req, res) => res.status(200).send('game-ops report server'));
