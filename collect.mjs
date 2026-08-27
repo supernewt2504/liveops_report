@@ -446,6 +446,15 @@ for (const proj of cfg.projects) {
     const uri = await fetchDataUri(iconUrls[key]);
     if (uri) { icons[key] = uri; } // 실패 시 기존 아이콘 유지
   }
+  // 갤럭시 아이콘: 자동수집(삼성 CDN) 실패 시 리포지토리 고정 파일로 대체 — 클라우드에서 정확한 갤럭시 아이콘 표시
+  if (proj.galaxyIconFile && !iconUrls.galaxy) {
+    try {
+      const buf = readFileSync(join(DIR, proj.galaxyIconFile));
+      const ext = /\.jpe?g$/i.test(proj.galaxyIconFile) ? 'jpeg' : 'png';
+      icons.galaxy = `data:image/${ext};base64,${buf.toString('base64')}`;
+      console.log('  ↩ 갤럭시 아이콘 파일 대체:', proj.galaxyIconFile);
+    } catch (e) { console.warn('  ! 갤럭시 아이콘 파일 로드 실패:', e.message); }
+  }
   console.log('  ✓ 스토어 아이콘 임베드:', Object.keys(icons).join(', ') || '없음');
   if (proj.lounge) {
     try { const l = await collectLounge(proj.lounge); mergeLounge(days, l);
