@@ -398,7 +398,8 @@ var T = {
     csTrend:"문의·처리 추이", csTrendDay:"일별 문의·처리 · 최근 7일 (%s ~ %e)", csTrendWeek:"일별 문의·처리 · %s ~ %e",
     csLegendNew:"신규 문의", csLegendResolved:"처리 완료",
     csByCategory:"분류별 문의", csByStatus:"상태 분포",
-    csSummary:"문의 현황 요약", csSummarySub:"최근 %n건 기반 · AI 분석", csSummaryNone:"요약 미생성 (ANTHROPIC_API_KEY 필요)",
+    csSummary:"문의 현황 요약", csSummarySub:"이 기간 %n건 기반 · AI 분석", csSummaryNone:"요약 미생성 (ANTHROPIC_API_KEY 필요)",
+    csNoInquiry:"문의 내용 없음", csSummaryCount:"이 기간 접수 %n건 — 분류별 문의 참고",
     csNone:"고객센터 데이터가 아직 없습니다.",
     unitRank:"위", unitCnt:"건", subDay:"%d 신규 리뷰 %n건 기준", subWeek:"%d 주간 신규 리뷰 %n건 기준",
     src:"◈ 실데이터 · 최근 수집 %t · 일자 %n개", footR:"구글 · 애플 · 라운지 연동 · 원스토어/갤럭시 지표",
@@ -439,7 +440,8 @@ var T = {
     csTrend:"咨询·处理趋势", csTrendDay:"每日咨询·处理 · 近7天 (%s ~ %e)", csTrendWeek:"每日咨询·处理 · %s ~ %e",
     csLegendNew:"新增咨询", csLegendResolved:"已处理",
     csByCategory:"按分类", csByStatus:"状态分布",
-    csSummary:"咨询概况摘要", csSummarySub:"基于最近%n件 · AI 分析", csSummaryNone:"尚未生成摘要 (需 ANTHROPIC_API_KEY)",
+    csSummary:"咨询概况摘要", csSummarySub:"基于本期%n件 · AI 分析", csSummaryNone:"尚未生成摘要 (需 ANTHROPIC_API_KEY)",
+    csNoInquiry:"本期无咨询", csSummaryCount:"本期受理%n件 — 详见按分类",
     csNone:"暂无客服数据。",
     unitRank:"名", unitCnt:"条", subDay:"%d 新增评论 共%n条", subWeek:"%d 周新增评论 共%n条",
     src:"◈ 实时数据 · 最近采集 %t · 天数 %n", footR:"已接入 Google · Apple · Lounge · ONE Store/Galaxy 指标",
@@ -652,13 +654,13 @@ function renderCS(L){
   document.getElementById("csH").textContent=L.csH;
   document.getElementById("csHint").textContent=L.csHint;
   // KPI: 리포트 기준일(일간) 또는 해당 주(주간) 기준. 차트는 일자별 표시.
-  var byCat=REAL.cs.byCategory||{};
   var TERM={"처리완료":1,"처리불가":1};
   var pd=csPeriodDates(), ppd=csPrevPeriodDates();
   var created=csSum(pd,'created'), resolved=csSum(pd,'resolved');
   var pC=ppd?csSum(ppd,'created'):null, pR=ppd?csSum(ppd,'resolved'):null;
   var pdSet={}; pd.forEach(function(d){pdSet[d]=1;});
-  var pending=(REAL.cs.inquiries||[]).filter(function(i){return pdSet[i.created]&&!TERM[i.status];}).length;  // 기간 내 접수분 중 미종결
+  var periodItems=(REAL.cs.inquiries||[]).filter(function(i){return pdSet[i.created];});  // 기간 내 접수 문의
+  var pending=periodItems.filter(function(i){return !TERM[i.status];}).length;  // 기간 내 접수분 중 미종결
   var kpi='<div class="summary cs-strip-wrap"><div class="hl-strip cs-strip">'+
     '<div class="hl"><span class="k">'+L.csKInquiry+'</span><span class="v"><span class="num">'+created+'</span><span class="unit">'+L.unitCnt+'</span>'+dchip(neuDelta(created,pC))+'</span></div>'+
     '<div class="hl"><span class="k">'+L.csKResolved+'</span><span class="v"><span class="num good">'+resolved+'</span><span class="unit">'+L.unitCnt+'</span>'+dchip(neuDelta(resolved,pR))+'</span></div>'+
@@ -668,17 +670,25 @@ function renderCS(L){
   var csub=(state.mode==="weekly"?L.csTrendWeek:L.csTrendDay).replace("%s",d2(wd[0])).replace("%e",d2(wd[wd.length-1]));
   var legend='<div class="cs-legend"><span class="lg"><span class="sw csbar-new"></span>'+L.csLegendNew+'</span><span class="lg"><span class="sw csbar-res"></span>'+L.csLegendResolved+'</span></div>';
   var chart='<div class="panel" style="margin-bottom:14px"><h3>'+L.csTrend+'</h3><p class="sub">'+csub+'</p>'+legend+csTrendChart(wd)+'</div>';
-  // 분류별 문의 (상태 분포 제거)
-  var ents=Object.keys(byCat).map(function(k){return [k,byCat[k]];}).sort(function(a,b){return b[1]-a[1];});
+  // 분류별 문의 — 선택 기간 접수분 기준(문서 기준 일자)
+  var catMap={}; periodItems.forEach(function(i){ var c=i.category||"미분류"; catMap[c]=(catMap[c]||0)+1; });
+  var ents=Object.keys(catMap).map(function(k){return [k,catMap[k]];}).sort(function(a,b){return b[1]-a[1];});
   var tot=ents.reduce(function(s,e){return s+e[1];},0)||1;
   var distRows=ents.map(function(e){ var pct=Math.round(e[1]/tot*100); return '<div class="cs-dist-row"><span class="cs-dist-name">'+esc(e[0])+'</span><span class="cs-dist-bar"><span class="cs-dist-fill" style="width:'+pct+'%"></span></span><span class="cs-dist-n">'+e[1]+'</span></div>'; }).join("");
-  var dist='<div class="panel cs-dist" style="margin-bottom:14px"><h3>'+L.csByCategory+'</h3>'+(distRows||'<p class="sub na">-</p>')+'</div>';
-  // 문의 현황 요약 (분류별 문의 하단)
-  var sum=REAL.cs.summary, sumHtml;
-  if(sum&&sum.gist){ var gist=(sum.gist[state.lang]||sum.gist.ko||"");
-    var chips=(sum.topics||[]).map(function(t){ var nm=(t.name&&(t.name[state.lang]||t.name.ko))||""; var nt=(t.note&&(t.note[state.lang]||t.note.ko))||""; var tc=t.tone==="neg"?"bad":t.tone==="pos"?"good":"neu"; return '<div class="sum-topic"><span class="chip '+tc+'">'+esc(nm)+'</span><span class="sum-note">'+esc(nt)+'</span></div>'; }).join("");
-    sumHtml='<div class="panel"><h3>'+L.csSummary+'</h3><p class="sub">'+L.csSummarySub.replace("%n",sum.basedOn||0)+'</p><p class="sum-gist">'+esc(gist)+'</p>'+(chips?'<div class="sum-topics">'+chips+'</div>':'')+'</div>';
-  } else { sumHtml='<div class="panel"><h3>'+L.csSummary+'</h3><p class="sub na">'+L.csSummaryNone+'</p></div>'; }
+  var dist='<div class="panel cs-dist" style="margin-bottom:14px"><h3>'+L.csByCategory+'</h3>'+(distRows||'<p class="sub na">'+L.csNoInquiry+'</p>')+'</div>';
+  // 문의 현황 요약 — 기준 기간의 AI 요약(최신 기간) 또는 사실 요약, 없으면 "문의 내용 없음"
+  var smAll=REAL.cs.summary||{};
+  var sm=state.mode==="weekly"?smAll.week:smAll.day;
+  var isLatest=state.mode==="weekly"?(state.period===WEEKS.length-1):(state.period===DAILY_LAST);
+  var sumHtml;
+  if(periodItems.length===0){
+    sumHtml='<div class="panel"><h3>'+L.csSummary+'</h3><p class="sub na">'+L.csNoInquiry+'</p></div>';
+  } else if(isLatest&&sm&&sm.gist){ var gist=(sm.gist[state.lang]||sm.gist.ko||"");
+    var chips=(sm.topics||[]).map(function(t){ var nm=(t.name&&(t.name[state.lang]||t.name.ko))||""; var nt=(t.note&&(t.note[state.lang]||t.note.ko))||""; var tc=t.tone==="neg"?"bad":t.tone==="pos"?"good":"neu"; return '<div class="sum-topic"><span class="chip '+tc+'">'+esc(nm)+'</span><span class="sum-note">'+esc(nt)+'</span></div>'; }).join("");
+    sumHtml='<div class="panel"><h3>'+L.csSummary+'</h3><p class="sub">'+L.csSummarySub.replace("%n",periodItems.length)+'</p><p class="sum-gist">'+esc(gist)+'</p>'+(chips?'<div class="sum-topics">'+chips+'</div>':'')+'</div>';
+  } else {
+    sumHtml='<div class="panel"><h3>'+L.csSummary+'</h3><p class="sub">'+L.csSummaryCount.replace("%n",periodItems.length)+'</p></div>';
+  }
   wrap.innerHTML=kpi+chart+dist+sumHtml;
 }
 function renderMail(L){
