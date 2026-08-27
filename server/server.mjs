@@ -64,25 +64,6 @@ app.get('/admin/run', (req, res) => {
   runPipeline({ mail, testTo }).catch(e => console.error('✗ admin/run 실패:', e.message));
 });
 
-// 진단: 클라우드(현재 리전)에서 삼성 갤럭시 API가 실제로 뭘 받는지 확인 (리전 변경 효과 가늠용)
-app.get('/admin/diag', async (req, res) => {
-  if (!tokenOk(req.query.t)) return res.status(401).json({ error: 'unauthorized' });
-  const cid = String(req.query.cid || '000009038539');
-  const out = {};
-  // 1) 이 서버의 아웃바운드 IP가 어느 나라로 보이는지
-  try { const g = await fetch('https://ipapi.co/json/'); const j = await g.json(); out.serverGeo = { ip: j.ip, country: j.country_name, cc: j.country_code, region: j.region }; }
-  catch (e) { out.serverGeo = { error: e.message }; }
-  // 2) 삼성 갤럭시 API 응답
-  try {
-    const r = await fetch(`https://galaxystore.samsung.com/api/detail/${cid}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    const text = await r.text();
-    let parsed = null;
-    try { const j = JSON.parse(text); const dm = j.DetailMain || {}; parsed = { rating: dm.ratingNumber, count: j.commentListTotalCount, countryCode: dm.countryCode, category: dm.generalCategoryName }; } catch {}
-    out.galaxy = { status: r.status, len: text.length, parsed, snippet: parsed ? undefined : text.slice(0, 200) };
-  } catch (e) { out.galaxy = { error: e.message, code: e.cause?.code }; }
-  res.json(out);
-});
-
 app.get('/', (req, res) => res.status(200).send('game-ops report server'));
 
 const PORT = process.env.PORT || 3000;
