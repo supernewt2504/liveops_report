@@ -17,6 +17,8 @@
       "galaxyRatingFallback": 5.0,
       "galaxyTotalRatingsFallback": 42,
       "galaxyIconFile": "galaxy-icon.png",
+      "helpdesk": true,
+      "helpdeskGame": "부족또전쟁",
       "lounge": "Heart_of_Valor",
       "googleCategory": "GAME",
       "appleCategory": "GAMES",

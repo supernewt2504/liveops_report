@@ -85,6 +85,7 @@ const REAL = {
   projectName: proj.name, projectNameZh: cfgProj.nameZh || proj.name, country: (db.meta?.country || 'kr').toUpperCase(), lastRun: db.meta?.lastRun || '',
   dates, stores, reviewsByDate, storeList, icons: proj.icons || {}, recipients: recipients,
   lounge: loungeLatest ? { latest: loungeLatest, series: loungeSeries, byDate: loungeByDate } : null,
+  cs: (cfgProj.helpdesk && proj.cs) ? proj.cs : null,   // 고객센터(helpdesk) 집계 — helpdesk=true 프로젝트만
   totals: {
     google: { overallScore: last.google?.overallScore ?? null, totalRatings: last.google?.totalRatings ?? null },
     apple: { overallScore: last.apple?.overallScore ?? null, totalRatings: last.apple?.totalRatings ?? null },
@@ -257,6 +258,20 @@ function TEMPLATE(dataJson) {
   .ct-val0{font-family:"IBM Plex Mono",monospace;font-size:11px;fill:var(--ink-3)}
   .ct-date{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;fill:var(--ink-2)}
   .ct-wd{font-size:10px;fill:var(--ink-3)}
+  /* 고객센터(CS) */
+  .lk .v .num.warn{color:var(--warn)}
+  .csbar-new{fill:var(--accent)} .csbar-res{fill:var(--good)}
+  .cs-legend{display:flex;gap:16px;margin:2px 0 6px;font-size:12px;color:var(--ink-2)}
+  .cs-legend .lg{display:inline-flex;align-items:center;gap:6px}
+  .cs-legend .sw{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .cs-legend .sw.csbar-new{background:var(--accent)} .cs-legend .sw.csbar-res{background:var(--good)}
+  .cs-dist h3{margin:0 0 10px}
+  .cs-dist-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+  .cs-dist-name{flex:none;width:74px;font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cs-dist-bar{flex:1;height:8px;background:var(--surface-3);border-radius:999px;overflow:hidden}
+  .cs-dist-fill{display:block;height:100%;background:var(--accent);border-radius:999px;min-width:4px}
+  .cs-dist-n{flex:none;font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--ink-2);min-width:24px;text-align:right}
+  .sub.na{color:var(--ink-3)}
   .bhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
   .bhead h3{margin:0}.bhead .sub{margin:0;font-size:12px;color:var(--ink-3)}
   .btabs{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
@@ -333,6 +348,10 @@ function TEMPLATE(dataJson) {
     <div class="sec-head"><h2 id="loungeH"></h2><span class="hint" id="loungeHint"></span></div>
     <div id="loungeWrap"></div>
   </section>
+  <section id="csSection" style="display:none">
+    <div class="sec-head"><h2 id="csH"></h2><span class="hint" id="csHint"></span></div>
+    <div id="csWrap"></div>
+  </section>
   <footer><span class="mono-note" id="src"></span><span id="footR"></span></footer>
   <div class="mail-recipients" id="mailBox"></div>
 </div>
@@ -370,6 +389,13 @@ var T = {
     loungeBoardsH:"게시판별 글", loungeBoardsHint:"기간 내 새 글이 올라온 게시판 · 탭 클릭 시 요약+글", loungeBoardNone:"이 기간에 새 글이 올라온 게시판이 없습니다.", boardPeriodCnt:"기간 내 %n글",
     loungeEventsH:"진행 이벤트", loungeEventsHint:"이 기간 진행 %n건 · 클릭 시 원문", loungeEventOngoing:"진행중", loungeEventEnded:"종료", loungeEventNone:"이 기간에 진행 중이던 이벤트가 없습니다.",
     loungeBoards:"게시판 %n개", loungeComment:"댓글", loungeBuff:"공감", loungeRead:"조회",
+    csH:"고객센터", csHint:"메일 문의 통합 · 최근 30일",
+    csKInquiry:"신규 문의", csKResolved:"처리 완료", csKPending:"미처리",
+    csTrend:"문의·처리 추이", csTrendDay:"일별 문의·처리 · 최근 7일 (%s ~ %e)", csTrendWeek:"일별 문의·처리 · %s ~ %e",
+    csLegendNew:"신규 문의", csLegendResolved:"처리 완료",
+    csByCategory:"분류별 문의", csByStatus:"상태 분포",
+    csSummary:"문의 현황 요약", csSummarySub:"최근 %n건 기반 · AI 분석", csSummaryNone:"요약 미생성 (ANTHROPIC_API_KEY 필요)",
+    csNone:"고객센터 데이터가 아직 없습니다.",
     unitRank:"위", unitCnt:"건", subDay:"%d 신규 리뷰 %n건 기준", subWeek:"%d 주간 신규 리뷰 %n건 기준",
     src:"◈ 실데이터 · 최근 수집 %t · 일자 %n개", footR:"구글 · 애플 · 라운지 연동 · 원스토어/갤럭시 지표",
     mailH:"📩 이 리포트 메일 수신자", mailCount:"%n명", mailNote:"추가·제외는 운영자에게 요청 (recipients.json 관리)", mailNone:"수신자 미설정 — recipients.json 에 추가하세요.",
@@ -404,6 +430,13 @@ var T = {
     loungeBoardsH:"板块帖子", loungeBoardsHint:"该期间有新帖的板块 · 点击标签查看摘要+帖子", loungeBoardNone:"该期间没有新帖的板块。", boardPeriodCnt:"期间%n帖",
     loungeEventsH:"进行中活动", loungeEventsHint:"该期间进行%n项 · 点击查看原文", loungeEventOngoing:"进行中", loungeEventEnded:"已结束", loungeEventNone:"该期间没有进行中的活动。",
     loungeBoards:"共%n个板块", loungeComment:"评论", loungeBuff:"点赞", loungeRead:"浏览",
+    csH:"客服中心", csHint:"邮件咨询整合 · 近30天",
+    csKInquiry:"新增咨询", csKResolved:"已处理", csKPending:"未处理",
+    csTrend:"咨询·处理趋势", csTrendDay:"每日咨询·处理 · 近7天 (%s ~ %e)", csTrendWeek:"每日咨询·处理 · %s ~ %e",
+    csLegendNew:"新增咨询", csLegendResolved:"已处理",
+    csByCategory:"按分类", csByStatus:"状态分布",
+    csSummary:"咨询概况摘要", csSummarySub:"基于最近%n件 · AI 分析", csSummaryNone:"尚未生成摘要 (需 ANTHROPIC_API_KEY)",
+    csNone:"暂无客服数据。",
     unitRank:"名", unitCnt:"条", subDay:"%d 新增评论 共%n条", subWeek:"%d 周新增评论 共%n条",
     src:"◈ 实时数据 · 最近采集 %t · 天数 %n", footR:"已接入 Google · Apple · Lounge · ONE Store/Galaxy 指标",
     mailH:"📩 本报告邮件收件人", mailCount:"%n人", mailNote:"增删请联系运营(管理 recipients.json)", mailNone:"未设置收件人 — 请在 recipients.json 添加。",
@@ -584,6 +617,62 @@ function loungeTrendChart(lo, wdates, L){
   }).join("");
   return '<div class="lchart-wrap"><svg class="lchart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img">'+base+bars+'</svg></div>';
 }
+// ===== 고객센터(helpdesk) 렌더 =====
+function csDailyMap(){ var m={}; ((REAL.cs&&REAL.cs.daily)||[]).forEach(function(r){ m[r.date]={created:r.created||0,resolved:r.resolved||0}; }); return m; }
+function csPeriodDates(){ if(state.mode==="weekly"){ var w=WEEKS[state.period], d=w.mon, o=[]; for(var i=0;i<7;i++){o.push(d);d=addDay(d,1);} return o;} return [DATES[state.period]]; }
+function csPrevPeriodDates(){ if(state.mode==="weekly"){ if(state.period<1)return null; var w=WEEKS[state.period-1], d=w.mon, o=[]; for(var i=0;i<7;i++){o.push(d);d=addDay(d,1);} return o;} return state.period>0?[DATES[state.period-1]]:null; }
+function csSum(dates,key){ var m=csDailyMap(),s=0; (dates||[]).forEach(function(d){ if(m[d]) s+=m[d][key]||0; }); return s; }
+function csTrendChart(wdates){
+  var m=csDailyMap();
+  var cA=wdates.map(function(d){return (m[d]&&m[d].created)||0;});
+  var cR=wdates.map(function(d){return (m[d]&&m[d].resolved)||0;});
+  var nmax=Math.max.apply(null, cA.concat(cR).concat([1]));
+  var n=wdates.length, W=Math.max(n*128,900), H=164, padB=34, padT=24, padX=16;
+  var innerW=W-2*padX, innerH=H-padT-padB, slot=innerW/n, bw=Math.min(slot*0.2,18), baseY=padT+innerH;
+  var base='<line x1="'+padX+'" y1="'+baseY.toFixed(1)+'" x2="'+(W-padX).toFixed(1)+'" y2="'+baseY.toFixed(1)+'" stroke="var(--border)"/>';
+  var bars=wdates.map(function(d,i){
+    var cx=padX+slot*i+slot/2;
+    function bar(v,off,cls){ if(v<=0) return ''; var h=(v/nmax)*innerH, x=cx+off, y=baseY-h;
+      return '<rect x="'+(x-bw/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="4" class="'+cls+'"/>'
+        +'<text x="'+x.toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" class="ct-val">'+v+'</text>'; }
+    var dt='<text x="'+cx.toFixed(1)+'" y="'+(baseY+17).toFixed(1)+'" text-anchor="middle" class="ct-date">'+d2(d)+'</text>';
+    var wk='<text x="'+cx.toFixed(1)+'" y="'+(baseY+29).toFixed(1)+'" text-anchor="middle" class="ct-wd">'+wdOf(d)+'</text>';
+    return bar(cA[i],-bw*0.62,'csbar-new')+bar(cR[i],bw*0.62,'csbar-res')+dt+wk;
+  }).join("");
+  return '<div class="lchart-wrap"><svg class="lchart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img">'+base+bars+'</svg></div>';
+}
+function renderCS(L){
+  var sec=document.getElementById("csSection"), wrap=document.getElementById("csWrap");
+  if(!REAL.cs){ if(sec) sec.style.display="none"; return; }
+  sec.style.display="";
+  document.getElementById("csH").textContent=L.csH;
+  document.getElementById("csHint").textContent=L.csHint;
+  var created=csSum(csPeriodDates(),'created'), resolved=csSum(csPeriodDates(),'resolved');
+  var ppd=csPrevPeriodDates();
+  var pC=ppd?csSum(ppd,'created'):null, pR=ppd?csSum(ppd,'resolved'):null;
+  var byStatus=REAL.cs.byStatus||{}, byCat=REAL.cs.byCategory||{};
+  var TERM={"처리완료":1,"처리불가":1};
+  var pending=Object.keys(byStatus).reduce(function(s,k){return s+(TERM[k]?0:byStatus[k]);},0);
+  var kpi='<div class="lounge-kpi">'+
+    '<div class="lk"><span class="k">'+L.csKInquiry+'</span><span class="v"><span class="num">'+created+'</span><span class="unit">'+L.unitCnt+'</span>'+dchip(neuDelta(created,pC))+'</span></div>'+
+    '<div class="lk"><span class="k">'+L.csKResolved+'</span><span class="v"><span class="num good">'+resolved+'</span><span class="unit">'+L.unitCnt+'</span>'+dchip(neuDelta(resolved,pR))+'</span></div>'+
+    '<div class="lk"><span class="k">'+L.csKPending+'</span><span class="v"><span class="num'+(pending>0?' warn':'')+'">'+pending+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
+    '</div>';
+  var sum=REAL.cs.summary, sumHtml;
+  if(sum&&sum.gist){ var gist=(sum.gist[state.lang]||sum.gist.ko||"");
+    var chips=(sum.topics||[]).map(function(t){ var nm=(t.name&&(t.name[state.lang]||t.name.ko))||""; var nt=(t.note&&(t.note[state.lang]||t.note.ko))||""; var tc=t.tone==="neg"?"bad":t.tone==="pos"?"good":"neu"; return '<div class="sum-topic"><span class="chip '+tc+'">'+esc(nm)+'</span><span class="sum-note">'+esc(nt)+'</span></div>'; }).join("");
+    sumHtml='<div class="panel" style="margin-bottom:14px"><h3>'+L.csSummary+'</h3><p class="sub">'+L.csSummarySub.replace("%n",sum.basedOn||0)+'</p><p class="sum-gist">'+esc(gist)+'</p>'+(chips?'<div class="sum-topics">'+chips+'</div>':'')+'</div>';
+  } else { sumHtml='<div class="panel" style="margin-bottom:14px"><h3>'+L.csSummary+'</h3><p class="sub na">'+L.csSummaryNone+'</p></div>'; }
+  var wd=loungeWindowDates();
+  var csub=(state.mode==="weekly"?L.csTrendWeek:L.csTrendDay).replace("%s",d2(wd[0])).replace("%e",d2(wd[wd.length-1]));
+  var legend='<div class="cs-legend"><span class="lg"><span class="sw csbar-new"></span>'+L.csLegendNew+'</span><span class="lg"><span class="sw csbar-res"></span>'+L.csLegendResolved+'</span></div>';
+  var chart='<div class="panel" style="margin-bottom:14px"><h3>'+L.csTrend+'</h3><p class="sub">'+csub+'</p>'+legend+csTrendChart(wd)+'</div>';
+  var distRow=function(title,obj){ var ents=Object.keys(obj).map(function(k){return [k,obj[k]];}).sort(function(a,b){return b[1]-a[1];}); var tot=ents.reduce(function(s,e){return s+e[1];},0)||1;
+    var rows=ents.map(function(e){ var pct=Math.round(e[1]/tot*100); return '<div class="cs-dist-row"><span class="cs-dist-name">'+esc(e[0])+'</span><span class="cs-dist-bar"><span class="cs-dist-fill" style="width:'+pct+'%"></span></span><span class="cs-dist-n">'+e[1]+'</span></div>'; }).join("");
+    return '<div class="panel cs-dist"><h3>'+title+'</h3>'+(rows||'<p class="sub na">-</p>')+'</div>'; };
+  var dist='<div class="grid-2">'+distRow(L.csByCategory,byCat)+distRow(L.csByStatus,byStatus)+'</div>';
+  wrap.innerHTML=kpi+sumHtml+chart+dist;
+}
 function renderMail(L){
   var box=document.getElementById("mailBox"); if(!box) return;
   if(!SHOW_MAIL_BAR){ box.innerHTML=""; return; } // 메일 첨부본에선 수신자 숨김
@@ -708,6 +797,7 @@ function render(){
   document.getElementById("notableSub").textContent=L.notableSub.replace("%p",cur.posN).replace("%n",cur.negN);
   document.getElementById("loungeH").textContent=L.loungeH;
   renderLounge(L);
+  renderCS(L);
   renderMail(L);
   document.getElementById("footR").textContent=L.footR;
 

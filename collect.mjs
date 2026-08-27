@@ -5,6 +5,7 @@ import store from 'app-store-scraper';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fetchCsReport, helpdeskEnabled } from './lib/helpdesk.mjs';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 // 런타임 데이터(data.json)·빌드 산출물 저장 위치. 클라우드는 영구 볼륨(/data), 로컬은 코드 디렉터리.
@@ -460,6 +461,20 @@ for (const proj of cfg.projects) {
     try { const l = await collectLounge(proj.lounge); mergeLounge(days, l);
       console.log('  ✓ 네이버 라운지: 누적 게시물 ' + l.totalPosts + ' · 오늘 신규 ' + l.newToday + ' · 게시판 ' + l.boards.length + ' · 글 있는 게시판 ' + Object.keys(l.boardFeeds).length + ' · 이벤트글 ' + (l.events?.length || 0)); }
     catch (e) { console.warn('  ✗ 라운지 수집 실패:', e.message); }
+  }
+  // 고객센터(helpdesk) 문의 집계 — projectA 등 helpdesk=true 프로젝트만. 최근 30일 창.
+  if (proj.helpdesk && proj.helpdeskGame && helpdeskEnabled()) {
+    try {
+      const to = TODAY;
+      const fromD = new Date(new Date(TODAY + 'T00:00:00Z').getTime() - 30 * 864e5).toISOString().slice(0, 10);
+      const cs = await fetchCsReport(proj.helpdeskGame, fromD, to);
+      db.projects[proj.id].cs = { ...cs, fetchedAt: new Date().toISOString() };
+      const totCreated = (cs.daily || []).reduce((s, d) => s + (d.created || 0), 0);
+      const totResolved = (cs.daily || []).reduce((s, d) => s + (d.resolved || 0), 0);
+      console.log('  ✓ 고객센터: 최근30일 문의 ' + totCreated + '건 · 처리 ' + totResolved + '건 · 목록 ' + (cs.inquiries || []).length + '건');
+    } catch (e) { console.warn('  ✗ 고객센터 수집 실패:', e.message); }
+  } else if (proj.helpdesk && !helpdeskEnabled()) {
+    console.log('  ℹ 고객센터 스킵 (HELPDESK_API_URL/HELPDESK_API_TOKEN 미설정)');
   }
 }
 
