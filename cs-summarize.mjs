@@ -1,5 +1,6 @@
 // 고객센터 AI 요약 — 리포트 기준 기간(일간=직전 완료일, 주간=최신 주)의 문의만 요약.
-// helpdesk=true 프로젝트의 db.projects[id].cs.summary = { day:{...}, week:{...} } 를 채운다.
+// helpdesk=true 프로젝트의 db.projects[id].cs.summary = { day:{...}, weeks:{ "<mon>":{...} } } 를 채운다.
+//   day  = 기준일(직전 완료일) 요약. weeks = 문의 있는 모든 월~일 주 요약(월요일 키).
 //   ANTHROPIC_API_KEY : 필수. 없으면 스킵.
 //   LOUNGE_MODEL      : 모델 override (기본 claude-opus-5).
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -50,16 +51,21 @@ async function summarize(client, items, periodLabel, game) {
   return { count: items.length, gist: out.gist, topics: out.topics || [] };
 }
 
-function periods(proj) {
-  const dates = Object.keys(db.projects[proj.id].days).sort();
-  const dayRef = dates[dates.length - 2] || dates[dates.length - 1];
+// 대시보드 buildWeeks와 동일한 월~일 주 버킷 (일자 키 기준)
+function weeksOf(dates) {
+  const out = [];
+  const first = new Date(dates[0] + 'T00:00:00Z');
+  first.setUTCDate(first.getUTCDate() - ((first.getUTCDay() + 6) % 7));
   const last = new Date(dates[dates.length - 1] + 'T00:00:00Z');
-  const dow = (last.getUTCDay() + 6) % 7;
-  const mon = new Date(last); mon.setUTCDate(mon.getUTCDate() - dow);
-  const monStr = mon.toISOString().slice(0, 10);
-  const sun = new Date(mon); sun.setUTCDate(sun.getUTCDate() + 6);
-  const sunStr = sun.toISOString().slice(0, 10);
-  return { dayRef, monStr, sunStr };
+  const cur = new Date(first);
+  while (cur <= last) {
+    const mon = cur.toISOString().slice(0, 10);
+    const sd = new Date(cur); sd.setUTCDate(sd.getUTCDate() + 6);
+    const sun = sd.toISOString().slice(0, 10);
+    if (dates.some(d => d >= mon && d <= sun)) out.push({ mon, sun });
+    cur.setUTCDate(cur.getUTCDate() + 7);
+  }
+  return out;
 }
 
 async function summarizeProject(proj) {
@@ -67,16 +73,25 @@ async function summarizeProject(proj) {
   const cs = p?.cs;
   if (!cs || !(cs.inquiries || [])) { console.log(`  [${proj.id}] CS 데이터 없음 → 스킵`); return; }
   const inq = cs.inquiries || [];
-  const { dayRef, monStr, sunStr } = periods(proj);
-  const dayItems = inq.filter(i => i.created === dayRef);
-  const weekItems = inq.filter(i => i.created >= monStr && i.created <= sunStr);
+  const dates = Object.keys(p.days).sort();
   const game = proj.helpdeskGame || proj.name;
   const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey: KEY });
+  // 일간: 기준일(직전 완료일)만 AI 요약
+  const dayRef = dates[dates.length - 2] || dates[dates.length - 1];
+  const dayItems = inq.filter(i => i.created === dayRef);
   const day = { date: dayRef, ...(await summarize(client, dayItems, dayRef, game)) };
-  const week = { from: monStr, to: sunStr, ...(await summarize(client, weekItems, `${monStr}~${sunStr}`, game)) };
-  p.cs.summary = { day, week, generatedAt: new Date().toISOString(), model: MODEL };
-  console.log(`  ✓ [${proj.id}] 고객센터 요약 — 기준일 ${dayRef}: ${day.count}건 / 주간 ${monStr}~${sunStr}: ${week.count}건`);
+  // 주간: 문의가 있는 모든 주에 AI 요약 (mon 키), 빈 주는 count:0만 저장
+  const weeks = {};
+  for (const w of weeksOf(dates)) {
+    const items = inq.filter(i => i.created >= w.mon && i.created <= w.sun);
+    weeks[w.mon] = items.length
+      ? { from: w.mon, to: w.sun, ...(await summarize(client, items, `${w.mon}~${w.sun}`, game)) }
+      : { from: w.mon, to: w.sun, count: 0 };
+  }
+  p.cs.summary = { day, weeks, generatedAt: new Date().toISOString(), model: MODEL };
+  const wkDone = Object.values(weeks).filter(w => w.count > 0).length;
+  console.log(`  ✓ [${proj.id}] 고객센터 요약 — 기준일 ${dayRef}: ${day.count}건 / 주간 요약 ${wkDone}개 생성`);
 }
 
 for (const proj of (cfg.projects || [])) {

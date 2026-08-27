@@ -678,12 +678,12 @@ function renderCS(L){
   var dist='<div class="panel cs-dist" style="margin-bottom:14px"><h3>'+L.csByCategory+'</h3>'+(distRows||'<p class="sub na">'+L.csNoInquiry+'</p>')+'</div>';
   // 문의 현황 요약 — 기준 기간의 AI 요약(최신 기간) 또는 사실 요약, 없으면 "문의 내용 없음"
   var smAll=REAL.cs.summary||{};
-  var sm=state.mode==="weekly"?smAll.week:smAll.day;
-  var isLatest=state.mode==="weekly"?(state.period===WEEKS.length-1):(state.period===DAILY_LAST);
+  // 주간: 해당 주(월요일=pd[0]) AI 요약. 일간: 기준일에만 AI 요약, 그 외 날짜는 사실 요약.
+  var sm=state.mode==="weekly"?((smAll.weeks||{})[pd[0]]||null):(state.period===DAILY_LAST?smAll.day:null);
   var sumHtml;
   if(periodItems.length===0){
     sumHtml='<div class="panel"><h3>'+L.csSummary+'</h3><p class="sub na">'+L.csNoInquiry+'</p></div>';
-  } else if(isLatest&&sm&&sm.gist){ var gist=(sm.gist[state.lang]||sm.gist.ko||"");
+  } else if(sm&&sm.gist){ var gist=(sm.gist[state.lang]||sm.gist.ko||"");
     var chips=(sm.topics||[]).map(function(t){ var nm=(t.name&&(t.name[state.lang]||t.name.ko))||""; var nt=(t.note&&(t.note[state.lang]||t.note.ko))||""; var tc=t.tone==="neg"?"bad":t.tone==="pos"?"good":"neu"; return '<div class="sum-topic"><span class="chip '+tc+'">'+esc(nm)+'</span><span class="sum-note">'+esc(nt)+'</span></div>'; }).join("");
     sumHtml='<div class="panel"><h3>'+L.csSummary+'</h3><p class="sub">'+L.csSummarySub.replace("%n",periodItems.length)+'</p><p class="sum-gist">'+esc(gist)+'</p>'+(chips?'<div class="sum-topics">'+chips+'</div>':'')+'</div>';
   } else {
