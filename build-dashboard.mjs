@@ -259,6 +259,10 @@ function TEMPLATE(dataJson) {
   .ct-date{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;fill:var(--ink-2)}
   .ct-wd{font-size:10px;fill:var(--ink-3)}
   /* 고객센터(CS) */
+  .cs-strip-wrap{margin-bottom:14px}
+  .cs-strip{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:560px){.cs-strip{grid-template-columns:1fr}}
+  .hl .v .num.warn{color:var(--warn)}
   .lk .v .num.warn{color:var(--warn)}
   .csbar-new{fill:var(--accent)} .csbar-res{fill:var(--good)}
   .cs-legend{display:flex;gap:16px;margin:2px 0 6px;font-size:12px;color:var(--ink-2)}
@@ -653,11 +657,11 @@ function renderCS(L){
   var byStatus=REAL.cs.byStatus||{}, byCat=REAL.cs.byCategory||{};
   var TERM={"처리완료":1,"처리불가":1};
   var pending=Object.keys(byStatus).reduce(function(s,k){return s+(TERM[k]?0:byStatus[k]);},0);
-  var kpi='<div class="lounge-kpi">'+
-    '<div class="lk"><span class="k">'+L.csKInquiry+'</span><span class="v"><span class="num">'+created+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
-    '<div class="lk"><span class="k">'+L.csKResolved+'</span><span class="v"><span class="num good">'+resolved+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
-    '<div class="lk"><span class="k">'+L.csKPending+'</span><span class="v"><span class="num'+(pending>0?' warn':'')+'">'+pending+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
-    '</div>';
+  var kpi='<div class="summary cs-strip-wrap"><div class="hl-strip cs-strip">'+
+    '<div class="hl"><span class="k">'+L.csKInquiry+'</span><span class="v"><span class="num">'+created+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
+    '<div class="hl"><span class="k">'+L.csKResolved+'</span><span class="v"><span class="num good">'+resolved+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
+    '<div class="hl"><span class="k">'+L.csKPending+'</span><span class="v"><span class="num'+(pending>0?' warn':'')+'">'+pending+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
+    '</div></div>';
   var sum=REAL.cs.summary, sumHtml;
   if(sum&&sum.gist){ var gist=(sum.gist[state.lang]||sum.gist.ko||"");
     var chips=(sum.topics||[]).map(function(t){ var nm=(t.name&&(t.name[state.lang]||t.name.ko))||""; var nt=(t.note&&(t.note[state.lang]||t.note.ko))||""; var tc=t.tone==="neg"?"bad":t.tone==="pos"?"good":"neu"; return '<div class="sum-topic"><span class="chip '+tc+'">'+esc(nm)+'</span><span class="sum-note">'+esc(nt)+'</span></div>'; }).join("");
