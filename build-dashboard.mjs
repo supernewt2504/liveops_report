@@ -393,7 +393,7 @@ var T = {
     loungeBoardsH:"게시판별 글", loungeBoardsHint:"기간 내 새 글이 올라온 게시판 · 탭 클릭 시 요약+글", loungeBoardNone:"이 기간에 새 글이 올라온 게시판이 없습니다.", boardPeriodCnt:"기간 내 %n글",
     loungeEventsH:"진행 이벤트", loungeEventsHint:"이 기간 진행 %n건 · 클릭 시 원문", loungeEventOngoing:"진행중", loungeEventEnded:"종료", loungeEventNone:"이 기간에 진행 중이던 이벤트가 없습니다.",
     loungeBoards:"게시판 %n개", loungeComment:"댓글", loungeBuff:"공감", loungeRead:"조회",
-    csH:"고객센터", csHint:"메일 문의 통합 · 최근 30일",
+    csH:"고객센터", csHint:"메일 문의 통합",
     csKInquiry:"신규 문의", csKResolved:"처리 완료", csKPending:"미처리",
     csTrend:"문의·처리 추이", csTrendDay:"일별 문의·처리 · 최근 7일 (%s ~ %e)", csTrendWeek:"일별 문의·처리 · %s ~ %e",
     csLegendNew:"신규 문의", csLegendResolved:"처리 완료",
@@ -434,7 +434,7 @@ var T = {
     loungeBoardsH:"板块帖子", loungeBoardsHint:"该期间有新帖的板块 · 点击标签查看摘要+帖子", loungeBoardNone:"该期间没有新帖的板块。", boardPeriodCnt:"期间%n帖",
     loungeEventsH:"进行中活动", loungeEventsHint:"该期间进行%n项 · 点击查看原文", loungeEventOngoing:"进行中", loungeEventEnded:"已结束", loungeEventNone:"该期间没有进行中的活动。",
     loungeBoards:"共%n个板块", loungeComment:"评论", loungeBuff:"点赞", loungeRead:"浏览",
-    csH:"客服中心", csHint:"邮件咨询整合 · 近30天",
+    csH:"客服中心", csHint:"邮件咨询整合",
     csKInquiry:"新增咨询", csKResolved:"已处理", csKPending:"未处理",
     csTrend:"咨询·处理趋势", csTrendDay:"每日咨询·处理 · 近7天 (%s ~ %e)", csTrendWeek:"每日咨询·处理 · %s ~ %e",
     csLegendNew:"新增咨询", csLegendResolved:"已处理",
@@ -651,31 +651,35 @@ function renderCS(L){
   sec.style.display="";
   document.getElementById("csH").textContent=L.csH;
   document.getElementById("csHint").textContent=L.csHint;
-  // KPI는 섹션 취지(최근 30일)·요약과 일치하도록 30일 전체 합계. 차트는 일자별 표시.
-  var created=(REAL.cs.daily||[]).reduce(function(s,d){return s+(d.created||0);},0);
-  var resolved=(REAL.cs.daily||[]).reduce(function(s,d){return s+(d.resolved||0);},0);
-  var byStatus=REAL.cs.byStatus||{}, byCat=REAL.cs.byCategory||{};
+  // KPI: 리포트 기준일(일간) 또는 해당 주(주간) 기준. 차트는 일자별 표시.
+  var byCat=REAL.cs.byCategory||{};
   var TERM={"처리완료":1,"처리불가":1};
-  var pending=Object.keys(byStatus).reduce(function(s,k){return s+(TERM[k]?0:byStatus[k]);},0);
+  var pd=csPeriodDates(), ppd=csPrevPeriodDates();
+  var created=csSum(pd,'created'), resolved=csSum(pd,'resolved');
+  var pC=ppd?csSum(ppd,'created'):null, pR=ppd?csSum(ppd,'resolved'):null;
+  var pdSet={}; pd.forEach(function(d){pdSet[d]=1;});
+  var pending=(REAL.cs.inquiries||[]).filter(function(i){return pdSet[i.created]&&!TERM[i.status];}).length;  // 기간 내 접수분 중 미종결
   var kpi='<div class="summary cs-strip-wrap"><div class="hl-strip cs-strip">'+
-    '<div class="hl"><span class="k">'+L.csKInquiry+'</span><span class="v"><span class="num">'+created+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
-    '<div class="hl"><span class="k">'+L.csKResolved+'</span><span class="v"><span class="num good">'+resolved+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
+    '<div class="hl"><span class="k">'+L.csKInquiry+'</span><span class="v"><span class="num">'+created+'</span><span class="unit">'+L.unitCnt+'</span>'+dchip(neuDelta(created,pC))+'</span></div>'+
+    '<div class="hl"><span class="k">'+L.csKResolved+'</span><span class="v"><span class="num good">'+resolved+'</span><span class="unit">'+L.unitCnt+'</span>'+dchip(neuDelta(resolved,pR))+'</span></div>'+
     '<div class="hl"><span class="k">'+L.csKPending+'</span><span class="v"><span class="num'+(pending>0?' warn':'')+'">'+pending+'</span><span class="unit">'+L.unitCnt+'</span></span></div>'+
     '</div></div>';
-  var sum=REAL.cs.summary, sumHtml;
-  if(sum&&sum.gist){ var gist=(sum.gist[state.lang]||sum.gist.ko||"");
-    var chips=(sum.topics||[]).map(function(t){ var nm=(t.name&&(t.name[state.lang]||t.name.ko))||""; var nt=(t.note&&(t.note[state.lang]||t.note.ko))||""; var tc=t.tone==="neg"?"bad":t.tone==="pos"?"good":"neu"; return '<div class="sum-topic"><span class="chip '+tc+'">'+esc(nm)+'</span><span class="sum-note">'+esc(nt)+'</span></div>'; }).join("");
-    sumHtml='<div class="panel" style="margin-bottom:14px"><h3>'+L.csSummary+'</h3><p class="sub">'+L.csSummarySub.replace("%n",sum.basedOn||0)+'</p><p class="sum-gist">'+esc(gist)+'</p>'+(chips?'<div class="sum-topics">'+chips+'</div>':'')+'</div>';
-  } else { sumHtml='<div class="panel" style="margin-bottom:14px"><h3>'+L.csSummary+'</h3><p class="sub na">'+L.csSummaryNone+'</p></div>'; }
   var wd=loungeWindowDates();
   var csub=(state.mode==="weekly"?L.csTrendWeek:L.csTrendDay).replace("%s",d2(wd[0])).replace("%e",d2(wd[wd.length-1]));
   var legend='<div class="cs-legend"><span class="lg"><span class="sw csbar-new"></span>'+L.csLegendNew+'</span><span class="lg"><span class="sw csbar-res"></span>'+L.csLegendResolved+'</span></div>';
   var chart='<div class="panel" style="margin-bottom:14px"><h3>'+L.csTrend+'</h3><p class="sub">'+csub+'</p>'+legend+csTrendChart(wd)+'</div>';
-  var distRow=function(title,obj){ var ents=Object.keys(obj).map(function(k){return [k,obj[k]];}).sort(function(a,b){return b[1]-a[1];}); var tot=ents.reduce(function(s,e){return s+e[1];},0)||1;
-    var rows=ents.map(function(e){ var pct=Math.round(e[1]/tot*100); return '<div class="cs-dist-row"><span class="cs-dist-name">'+esc(e[0])+'</span><span class="cs-dist-bar"><span class="cs-dist-fill" style="width:'+pct+'%"></span></span><span class="cs-dist-n">'+e[1]+'</span></div>'; }).join("");
-    return '<div class="panel cs-dist"><h3>'+title+'</h3>'+(rows||'<p class="sub na">-</p>')+'</div>'; };
-  var dist='<div class="grid-2">'+distRow(L.csByCategory,byCat)+distRow(L.csByStatus,byStatus)+'</div>';
-  wrap.innerHTML=kpi+sumHtml+chart+dist;
+  // 분류별 문의 (상태 분포 제거)
+  var ents=Object.keys(byCat).map(function(k){return [k,byCat[k]];}).sort(function(a,b){return b[1]-a[1];});
+  var tot=ents.reduce(function(s,e){return s+e[1];},0)||1;
+  var distRows=ents.map(function(e){ var pct=Math.round(e[1]/tot*100); return '<div class="cs-dist-row"><span class="cs-dist-name">'+esc(e[0])+'</span><span class="cs-dist-bar"><span class="cs-dist-fill" style="width:'+pct+'%"></span></span><span class="cs-dist-n">'+e[1]+'</span></div>'; }).join("");
+  var dist='<div class="panel cs-dist" style="margin-bottom:14px"><h3>'+L.csByCategory+'</h3>'+(distRows||'<p class="sub na">-</p>')+'</div>';
+  // 문의 현황 요약 (분류별 문의 하단)
+  var sum=REAL.cs.summary, sumHtml;
+  if(sum&&sum.gist){ var gist=(sum.gist[state.lang]||sum.gist.ko||"");
+    var chips=(sum.topics||[]).map(function(t){ var nm=(t.name&&(t.name[state.lang]||t.name.ko))||""; var nt=(t.note&&(t.note[state.lang]||t.note.ko))||""; var tc=t.tone==="neg"?"bad":t.tone==="pos"?"good":"neu"; return '<div class="sum-topic"><span class="chip '+tc+'">'+esc(nm)+'</span><span class="sum-note">'+esc(nt)+'</span></div>'; }).join("");
+    sumHtml='<div class="panel"><h3>'+L.csSummary+'</h3><p class="sub">'+L.csSummarySub.replace("%n",sum.basedOn||0)+'</p><p class="sum-gist">'+esc(gist)+'</p>'+(chips?'<div class="sum-topics">'+chips+'</div>':'')+'</div>';
+  } else { sumHtml='<div class="panel"><h3>'+L.csSummary+'</h3><p class="sub na">'+L.csSummaryNone+'</p></div>'; }
+  wrap.innerHTML=kpi+chart+dist+sumHtml;
 }
 function renderMail(L){
   var box=document.getElementById("mailBox"); if(!box) return;
