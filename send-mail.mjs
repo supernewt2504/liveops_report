@@ -149,8 +149,10 @@ async function buildReport(lang) {
   const p = t => `<p style="margin:0 0 10px;color:${C.ink2}">${t}</p>`;
   const block = (title, tcol, tbg, inner) => `<div style="border:1px solid ${C.bd};border-radius:12px;margin:14px 0;overflow:hidden"><div style="background:${tbg};padding:10px 16px;font-weight:700;font-size:14px;color:${tcol}">${title}</div><div style="padding:2px 16px 12px">${inner}</div></div>`;
   // 웹 리포트 링크(토큰)가 설정돼 있으면 버튼 노출 + 첨부 안내는 보조로. 없으면 기존 첨부 안내만.
+  // 짧은 경로 코드(a,b,c…) — db.projects 순서 기준. 서버가 /a,/b 로 매핑.
+  const shortCode = ['a', 'b', 'c', 'd'][Object.keys(db.projects).indexOf(projId)] || projId;
   const webLink = (REPORT_BASE && REPORT_TOKEN)
-    ? `${REPORT_BASE}/r/${projId}?t=${encodeURIComponent(REPORT_TOKEN)}${lang === 'zh' ? '&lang=zh' : ''}` : null;
+    ? `${REPORT_BASE}/${shortCode}?t=${encodeURIComponent(REPORT_TOKEN)}${lang === 'zh' ? '&lang=zh' : ''}` : null;
   const linkbox = webLink
     ? `<div style="margin:20px 0 6px"><a href="${webLink}" style="display:inline-block;background:${STORE.col};color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">${L.viewWeb} →</a><div style="margin-top:9px;color:${C.ink3};font-size:12px">${L.viewWebSub}</div></div>`
     : `<div style="margin:20px 0 6px;padding:11px 14px;background:${C.bg};border-radius:8px;color:${C.ink2};font-size:13px">${L.linkbox}</div>`;
