@@ -438,6 +438,16 @@ for (const proj of cfg.projects) {
     try { const g = await collectGalaxy(proj.galaxy, proj.galaxyGuid); mergeMetrics(days, 'galaxy', g); iconUrls.galaxy = g.iconUrl;
       console.log('  ✓ 갤럭시(지표): ★' + g.overallScore + ' · 누적평가 ' + g.totalRatings + ' · 전체게임 인기순위 ' + (g.rankFree ?? '순위없음')); }
     catch (e) { console.warn('  ✗ 갤럭시 수집 실패:', e.message); }
+    // 갤럭시 별점 자동수집 실패(예: 클라우드에서 삼성 API 지역차단) 시 설정값으로 고정 표기
+    if (proj.galaxyRatingFallback != null) {
+      days[TODAY] ??= { stores: {} };
+      const s = (days[TODAY].stores.galaxy ??= { metricsOnly: true });
+      if (s.overallScore == null) {
+        s.overallScore = proj.galaxyRatingFallback;
+        if (s.totalRatings == null && proj.galaxyTotalRatingsFallback != null) s.totalRatings = proj.galaxyTotalRatingsFallback;
+        console.log('  ↩ 갤럭시 별점 폴백 적용: ★' + s.overallScore);
+      }
+    }
   }
   // 스토어 아이콘(각 스토어에 노출 중인 아이콘)을 data URI로 임베드 — 아티팩트 CSP 대응
   const icons = (db.projects[proj.id].icons ??= {});

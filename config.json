@@ -13,6 +13,8 @@
       "onestore": "0001007060",
       "galaxy": "000009038539",
       "galaxyGuid": "com.jszx.samsung",
+      "galaxyRatingFallback": 5.0,
+      "galaxyTotalRatingsFallback": 42,
       "lounge": "Heart_of_Valor",
       "googleCategory": "GAME",
       "appleCategory": "GAMES",
