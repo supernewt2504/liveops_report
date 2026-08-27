@@ -438,16 +438,6 @@ for (const proj of cfg.projects) {
     try { const g = await collectGalaxy(proj.galaxy, proj.galaxyGuid); mergeMetrics(days, 'galaxy', g); iconUrls.galaxy = g.iconUrl;
       console.log('  ✓ 갤럭시(지표): ★' + g.overallScore + ' · 누적평가 ' + g.totalRatings + ' · 전체게임 인기순위 ' + (g.rankFree ?? '순위없음')); }
     catch (e) { console.warn('  ✗ 갤럭시 수집 실패:', e.message); }
-    // 갤럭시 별점 자동수집 실패(예: 클라우드에서 삼성 API 지역차단) 시 설정값으로 고정 표기
-    if (proj.galaxyRatingFallback != null) {
-      days[TODAY] ??= { stores: {} };
-      const s = (days[TODAY].stores.galaxy ??= { metricsOnly: true });
-      if (s.overallScore == null) {
-        s.overallScore = proj.galaxyRatingFallback;
-        if (s.totalRatings == null && proj.galaxyTotalRatingsFallback != null) s.totalRatings = proj.galaxyTotalRatingsFallback;
-        console.log('  ↩ 갤럭시 별점 폴백 적용: ★' + s.overallScore);
-      }
-    }
   }
   // 스토어 아이콘(각 스토어에 노출 중인 아이콘)을 data URI로 임베드 — 아티팩트 CSP 대응
   const icons = (db.projects[proj.id].icons ??= {});
@@ -476,6 +466,21 @@ if (!manualRanks) manualRanks = loadRanksJson();
 // 순위 시트/ranks.json 은 첫 프로젝트(부족또전쟁) 전용. 다른 프로젝트만 수집할 땐 건드리지 않음.
 const RANK_TARGET = cfg.projects[0].id;
 if (!PROJ_FILTER || PROJ_FILTER === RANK_TARGET) applyRanks(db, manualRanks, RANK_TARGET);
+
+// 갤럭시 별점 폴백: 자동수집(삼성API)이 클라우드에서 막혀 별점이 null이므로, 설정값으로 고정.
+// 시트/수집으로 galaxy 스냅샷이 있는 '모든 날짜'에 채워, 리포트가 전일을 표시해도 별점이 보이게 함.
+for (const proj of cfg.projects) {
+  if (proj.galaxyRatingFallback == null) continue;
+  const pdays = db.projects[proj.id]?.days || {};
+  for (const d of Object.keys(pdays)) {
+    const g = pdays[d].stores?.galaxy;
+    if (g && g.overallScore == null) {
+      g.overallScore = proj.galaxyRatingFallback;
+      if (g.totalRatings == null && proj.galaxyTotalRatingsFallback != null) g.totalRatings = proj.galaxyTotalRatingsFallback;
+    }
+  }
+}
+
 db.meta.lastRun = new Date().toISOString();
 db.meta.country = COUNTRY;
 writeFileSync(outPath, JSON.stringify(db, null, 2));
