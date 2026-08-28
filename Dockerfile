@@ -1,4 +1,5 @@
-FROM node:20-slim
+# Docker Hub 접속 불안정(빌더에서 registry-1.docker.io 연결 실패) 대비: AWS ECR Public 미러(도커 공식 이미지) 사용
+FROM public.ecr.aws/docker/library/node:20-slim
 
 WORKDIR /app
 COPY package.json ./
