@@ -104,6 +104,7 @@ console.log(`✓ [${projId}] ${base}(.html/-zh/-mail/-mail-zh) 생성 (일자 ${
 
 function TEMPLATE(dataJson) {
   return `<title>운영 대시보드 · ${REAL.projectName}</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNiAzMkM2IDMyIDE3IDE1IDMyIDE1QzQ3IDE1IDU4IDMyIDU4IDMyQzU4IDMyIDQ3IDQ5IDMyIDQ5QzE3IDQ5IDYgMzIgNiAzMloiIGZpbGw9IiMxNjFiMjYiLz48cGF0aCBkPSJNMTcgMzJDMTcgMzIgMjQgMjMgMzIgMjNDNDAgMjMgNDcgMzIgNDcgMzJDNDcgMzIgNDAgNDEgMzIgNDFDMjQgNDEgMTcgMzIgMTcgMzJaIiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iOC41IiBmaWxsPSIjMTYxYjI2Ii8+PC9zdmc+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap">
