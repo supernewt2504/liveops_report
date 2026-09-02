@@ -12,7 +12,7 @@ import { gmailApiEnabled, gmailSend, gmailSender } from './lib/gmail-send.mjs';
 const DIR = dirname(fileURLToPath(import.meta.url));
 // 런타임 데이터·대시보드 산출물 위치 (클라우드=/data 볼륨, 로컬=코드 디렉터리)
 const DATA_DIR = process.env.DATA_DIR || DIR;
-const FROM_NAME = { ko: '부족또전쟁 운영팀', zh: '决胜之心 运营团队' };
+// FROM_NAME·GAME(브랜딩)은 프로젝트 로드 후 config 기준으로 정의 (아래)
 // 메일 본문에 넣을 웹 리포트 링크 (둘 다 설정돼야 버튼 표시). 예: https://game-ops.up.railway.app
 const REPORT_BASE = (process.env.REPORT_BASE_URL || '').replace(/\/$/, '');
 const REPORT_TOKEN = process.env.REPORT_TOKEN || '';
@@ -37,8 +37,13 @@ if (!USE_GMAIL_API) {
 }
 
 const db = JSON.parse(readFileSync(join(DATA_DIR, 'data.json'), 'utf8'));
-const projId = Object.keys(db.projects)[0];
+const projId = (process.env.PROJECT && db.projects[process.env.PROJECT]) ? process.env.PROJECT : Object.keys(db.projects)[0];
 const proj = db.projects[projId];
+// 프로젝트별 메일 브랜딩 (config.json mailNameKo/mailNameZh)
+let cfgProj = {};
+try { cfgProj = (JSON.parse(readFileSync(join(DIR, 'config.json'), 'utf8')).projects || []).find(p => p.id === projId) || {}; } catch {}
+const GAME = { ko: cfgProj.mailNameKo || cfgProj.name || projId, zh: cfgProj.mailNameZh || cfgProj.nameZh || cfgProj.mailNameKo || cfgProj.name || projId };
+const FROM_NAME = { ko: `${GAME.ko} 운영팀`, zh: `${GAME.zh} 运营团队` };
 const days = proj.days;
 const allDates = Object.keys(days).sort();
 
@@ -56,15 +61,15 @@ try {
 if (!byLang.ko.length && !byLang.zh.length && cred.to) byLang.ko = [cred.to];
 // 테스트 우회: MAIL_TEST_TO 가 있으면 운영 수신자 무시하고 그 주소로만 1통(한국어) 발송
 if (process.env.MAIL_TEST_TO) { byLang.ko = [process.env.MAIL_TEST_TO]; byLang.zh = []; console.log('🧪 테스트 발송 모드 →', process.env.MAIL_TEST_TO); }
-if (!byLang.ko.length && !byLang.zh.length) { console.error('✗ 수신자 없음'); process.exit(1); }
+if (!byLang.ko.length && !byLang.zh.length) { console.log(`ℹ [${projId}] 수신자 없음 → 발송 건너뜀`); process.exit(0); }
 
 // ================= 라벨/문구 사전 =================
 const T = {
   ko: {
-    game: '부족또전쟁', wUnit: '건',
-    subjW: (m, s) => `[부족또전쟁] 주간 운영 리포트 (${m} ~ ${s})`,
-    subjD: (d, w) => `[부족또전쟁] 일일 운영 리포트 ${d}(${w})`,
-    titleW: '🎮 부족또전쟁 주간 운영 리포트', titleD: '🎮 부족또전쟁 일일 운영 리포트',
+    game: GAME.ko, wUnit: '건',
+    subjW: (m, s) => `[${GAME.ko}] 주간 운영 리포트 (${m} ~ ${s})`,
+    subjD: (d, w) => `[${GAME.ko}] 일일 운영 리포트 ${d}(${w})`,
+    titleW: `🎮 ${GAME.ko} 주간 운영 리포트`, titleD: `🎮 ${GAME.ko} 일일 운영 리포트`,
     metaW: (m, mw, s, sw) => `${m} (${mw}) ~ ${s} (${sw})`,
     metaD: (d, w) => `${d} (${w}) 기준 · 전일 대비`,
     storeBlock: '📊 스토어 지표', loungeBlock: '💬 네이버 라운지',
@@ -83,7 +88,7 @@ const T = {
     viewWeb: '웹에서 리포트 보기',
     viewWebSub: '버튼을 누르면 웹에서 전체 지표·리뷰·라운지 여론(일간/주간·한/중)을 확인할 수 있습니다.',
     linkbox: '📎 상세 지표·리뷰·라운지 여론은 <b>첨부된 대시보드 HTML</b>을 브라우저로 열어 확인해 주세요.',
-    foot: '자동 발송 · 부족또전쟁 운영 대시보드 파이프라인',
+    foot: `자동 발송 · ${GAME.ko} 운영 대시보드 파이프라인`,
     leadW: (a, b, c, d) => `지난주 원스토어 순위는 인기 ${a}·매출 ${b}에서 시작해 주말에는 <b>인기 ${c}·매출 ${d}</b>를 기록했습니다. 구글·애플은 순위권 밖을 유지했습니다.`,
     cum: (gs, gc, as, ac) => `누적 별점은 구글 ${gs}(${gc}건)·애플 ${as}(${ac}건)로 집계되었습니다.`,
     reviewW: (n, pn, rd, pos, neg, negW, negP) => `주간 신규 리뷰는 <b>${n}건</b>으로 전주(${pn}건) 대비 ${rd}했습니다. 긍정 ${pos}건·부정 ${neg}건으로 부정 비중은 전주 ${negP}%에서 <b>${negW}%</b>였습니다.`,
@@ -93,10 +98,10 @@ const T = {
     reviewD: (n, p, ng, tn) => `당일 신규 리뷰는 <b>${n}건</b>(긍정 ${p}건·부정 ${ng}건)이었습니다.${tn ? ` 부정 리뷰 중에서는 <b>${tn[0]}</b> 관련 의견(${tn[1]}건)이 가장 많았습니다.` : ''}`,
   },
   zh: {
-    game: '决胜之心', wUnit: '条',
-    subjW: (m, s) => `[决胜之心] 周运营报告 (${m} ~ ${s})`,
-    subjD: (d, w) => `[决胜之心] 日运营报告 ${d}(${w})`,
-    titleW: '🎮 决胜之心 周运营报告', titleD: '🎮 决胜之心 日运营报告',
+    game: GAME.zh, wUnit: '条',
+    subjW: (m, s) => `[${GAME.zh}] 周运营报告 (${m} ~ ${s})`,
+    subjD: (d, w) => `[${GAME.zh}] 日运营报告 ${d}(${w})`,
+    titleW: `🎮 ${GAME.zh} 周运营报告`, titleD: `🎮 ${GAME.zh} 日运营报告`,
     metaW: (m, mw, s, sw) => `${m} (${mw}) ~ ${s} (${sw})`,
     metaD: (d, w) => `${d} (${w}) 基准 · 较前日`,
     storeBlock: '📊 商店指标', loungeBlock: '💬 NAVER 论坛',
@@ -115,7 +120,7 @@ const T = {
     viewWeb: '在网页查看报告',
     viewWebSub: '点击按钮即可在网页查看完整指标·评论·论坛舆情(日报/周报·中/韩)。',
     linkbox: '📎 详细指标·评论·论坛舆情请打开<b>附件仪表板 HTML</b>查看。',
-    foot: '自动发送 · 决胜之心 运营仪表板流程',
+    foot: `自动发送 · ${GAME.zh} 运营仪表板流程`,
     leadW: (a, b, c, d) => `上周 ONE Store 排名从人气 ${a}·畅销 ${b} 开始，周末为 <b>人气 ${c}·畅销 ${d}</b>。Google·Apple 维持在榜单外。`,
     cum: (gs, gc, as, ac) => `累计评分为 Google ${gs}(${gc}条)·Apple ${as}(${ac}条)。`,
     reviewW: (n, pn, rd, pos, neg, negW, negP) => `本周新增评论 <b>${n}条</b>，较上周(${pn}条)${rd}。好评 ${pos}条·差评 ${neg}条，差评占比由上周 ${negP}% 变为 <b>${negW}%</b>。`,

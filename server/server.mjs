@@ -75,8 +75,9 @@ app.get('/admin/run', (req, res) => {
   if (!tokenOk(req.query.t)) return res.status(401).json({ error: 'unauthorized' });
   const mail = req.query.mail !== '0';
   const testTo = req.query.to ? String(req.query.to) : null;   // 지정 시 그 주소로만 발송(테스트)
-  res.json({ ok: true, started: true, mail, testTo, msg: '파이프라인 시작 (진행상황은 Deploy Logs 참고)' });
-  runPipeline({ mail, testTo }).catch(e => console.error('✗ admin/run 실패:', e.message));
+  const mailProject = req.query.project ? String(req.query.project) : null; // 지정 시 해당 프로젝트만 발송(테스트)
+  res.json({ ok: true, started: true, mail, testTo, mailProject, msg: '파이프라인 시작 (진행상황은 Deploy Logs 참고)' });
+  runPipeline({ mail, testTo, mailProject }).catch(e => console.error('✗ admin/run 실패:', e.message));
 });
 
 // 최상위 경로: /jszx-… (비밀 슬러그) · /a · /b (알 수 없으면 통과 → 404)
