@@ -316,6 +316,7 @@ function parseCsv(text) {
 }
 // 시트에서 가져올 순위: 원스토어 인기+매출, 갤럭시 매출만 (구글/애플/갤럭시인기는 자동)
 async function fetchSheetRanks(url) {
+  url = url.replace(/\/pubhtml(\?[^#]*)?$/, '/pub?output=csv');   // 게시된 HTML 링크도 CSV로 자동 변환
   const res = await fetch(url, { redirect: 'follow' });
   const rows = parseCsv(await res.text());
   if (rows.length < 2) return null;
@@ -478,18 +479,23 @@ for (const proj of cfg.projects) {
   }
 }
 
-// 수동 순위: 구글 시트(있으면) 우선, 없으면 ranks.json. 자동 수집값이 있으면 자동 우선.
-let manualRanks = null;
-// 시트 URL은 환경변수(RANKS_SHEET_CSV_URL) 우선, 없으면 config. (공개 리포엔 링크를 두지 않기 위함)
-const SHEET_URL = process.env.RANKS_SHEET_CSV_URL || cfg.ranksSheetCsvUrl;
-if (SHEET_URL) {
-  try { manualRanks = await fetchSheetRanks(SHEET_URL); console.log('  📄 구글시트 순위 로드됨'); }
-  catch (e) { console.warn('  ! 구글시트 로드 실패:', e.message); }
+// 수동 순위: 프로젝트별 구글시트(원스토어/갤럭시 인기·매출). 자동 수집값이 있으면 자동 우선.
+// URL은 환경변수 우선(민감 링크를 공개 리포에 두지 않기 위함):
+//   - 첫 프로젝트: RANKS_SHEET_CSV_URL (또는 config.ranksSheetCsvUrl), 실패 시 ranks.json 폴백
+//   - 그 외 프로젝트: RANKS_SHEET_CSV_URL_<projId> (또는 config projects[].ranksSheetCsvUrl)
+for (const rp of cfg.projects) {
+  if (PROJ_FILTER && rp.id !== PROJ_FILTER) continue;
+  const isFirst = rp.id === cfg.projects[0].id;
+  const url = process.env['RANKS_SHEET_CSV_URL_' + rp.id] || rp.ranksSheetCsvUrl
+    || (isFirst ? (process.env.RANKS_SHEET_CSV_URL || cfg.ranksSheetCsvUrl) : null);
+  let manualRanks = null;
+  if (url) {
+    try { manualRanks = await fetchSheetRanks(url); console.log(`  📄 [${rp.id}] 구글시트 순위 로드됨`); }
+    catch (e) { console.warn(`  ! [${rp.id}] 구글시트 로드 실패:`, e.message); }
+  }
+  if (!manualRanks && isFirst) manualRanks = loadRanksJson();   // 첫 프로젝트만 로컬 폴백
+  if (manualRanks) applyRanks(db, manualRanks, rp.id);
 }
-if (!manualRanks) manualRanks = loadRanksJson();
-// 순위 시트/ranks.json 은 첫 프로젝트(부족또전쟁) 전용. 다른 프로젝트만 수집할 땐 건드리지 않음.
-const RANK_TARGET = cfg.projects[0].id;
-if (!PROJ_FILTER || PROJ_FILTER === RANK_TARGET) applyRanks(db, manualRanks, RANK_TARGET);
 
 // 갤럭시 별점 폴백: 자동수집(삼성API)이 클라우드에서 막혀 별점이 null이므로, 설정값으로 고정.
 // 시트/수집으로 galaxy 스냅샷이 있는 '모든 날짜'에 채워, 리포트가 전일을 표시해도 별점이 보이게 함.
