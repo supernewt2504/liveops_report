@@ -511,6 +511,17 @@ for (const proj of cfg.projects) {
   }
 }
 
+// 원스토어 별점 backfill: 스냅샷은 있는데 별점이 빈 날(과거 수집 실패 등)을 최신 스크랩 별점으로 보완.
+// 리포트가 전일을 표시해도 최신 누적 별점이 보이게 함(ratingAsOf 이월용). 정상 수집일이 있으면 그 값 사용.
+for (const proj of cfg.projects) {
+  const pdays = db.projects[proj.id]?.days || {};
+  const dts = Object.keys(pdays).sort();
+  let latest = null;
+  for (const d of dts) { const s = pdays[d].stores?.onestore; if (s && s.overallScore != null) latest = s.overallScore; }
+  if (latest == null) continue;
+  for (const d of dts) { const s = pdays[d].stores?.onestore; if (s && s.overallScore == null) s.overallScore = latest; }
+}
+
 db.meta.lastRun = new Date().toISOString();
 db.meta.country = COUNTRY;
 writeFileSync(outPath, JSON.stringify(db, null, 2));
