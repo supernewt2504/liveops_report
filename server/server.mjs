@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import { startScheduler } from '../worker/scheduler.mjs';
-import { runPipeline } from '../lib/pipeline.mjs';
+import { runPipeline, runRankPeak } from '../lib/pipeline.mjs';
 import { backupToDrive, driveEnabled } from '../lib/gdrive-backup.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -78,6 +78,13 @@ app.get('/admin/run', (req, res) => {
   const mailProject = req.query.project ? String(req.query.project) : null; // 지정 시 해당 프로젝트만 발송(테스트)
   res.json({ ok: true, started: true, mail, testTo, mailProject, msg: '파이프라인 시작 (진행상황은 Deploy Logs 참고)' });
   runPipeline({ mail, testTo, mailProject }).catch(e => console.error('✗ admin/run 실패:', e.message));
+});
+
+// 일중 순위 피크 즉시 갱신(수집·요약·메일 없이 순위만 조회→최고순위 반영→대시보드 재빌드)
+app.get('/admin/peak', (req, res) => {
+  if (!tokenOk(req.query.t)) return res.status(401).json({ error: 'unauthorized' });
+  res.json({ ok: true, started: true, msg: '순위 피크 수집 시작 (진행상황은 Deploy Logs 참고)' });
+  runRankPeak().catch(e => console.error('✗ admin/peak 실패:', e.message));
 });
 
 // 최상위 경로: /jszx-… (비밀 슬러그) · /a · /b (알 수 없으면 통과 → 404)
