@@ -317,7 +317,9 @@ function parseCsv(text) {
 // 시트에서 가져올 순위: 원스토어 인기+매출, 갤럭시 매출만 (구글/애플/갤럭시인기는 자동)
 async function fetchSheetRanks(url) {
   url = url.replace(/\/pubhtml(\?[^#]*)?$/, '/pub?output=csv');   // 게시된 HTML 링크도 CSV로 자동 변환
-  const res = await fetch(url, { redirect: 'follow' });
+  // 구글 게시 CSV의 캐시 지연 우회: 매 요청 고유 파라미터 + no-cache 헤더로 최신 시트를 받음
+  const bust = (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
+  const res = await fetch(url + bust, { redirect: 'follow', cache: 'no-store', headers: { 'cache-control': 'no-cache', 'pragma': 'no-cache' } });
   const rows = parseCsv(await res.text());
   if (rows.length < 2) return null;
   const findCol = (nameKws, metricKws) => {
