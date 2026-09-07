@@ -76,8 +76,9 @@ app.get('/admin/run', (req, res) => {
   const mail = req.query.mail !== '0';
   const testTo = req.query.to ? String(req.query.to) : null;   // 지정 시 그 주소로만 발송(테스트)
   const mailProject = req.query.project ? String(req.query.project) : null; // 지정 시 해당 프로젝트만 발송(테스트)
-  res.json({ ok: true, started: true, mail, testTo, mailProject, msg: '파이프라인 시작 (진행상황은 Deploy Logs 참고)' });
-  runPipeline({ mail, testTo, mailProject }).catch(e => console.error('✗ admin/run 실패:', e.message));
+  const subjectSuffix = req.query.subject ? String(req.query.subject) : null; // 메일 제목 접미사(재발송 표시 등)
+  res.json({ ok: true, started: true, mail, testTo, mailProject, subjectSuffix, msg: '파이프라인 시작 (진행상황은 Deploy Logs 참고)' });
+  runPipeline({ mail, testTo, mailProject, subjectSuffix }).catch(e => console.error('✗ admin/run 실패:', e.message));
 });
 
 // 일중 순위 피크 즉시 갱신(수집·요약·메일 없이 순위만 조회→최고순위 반영→대시보드 재빌드)

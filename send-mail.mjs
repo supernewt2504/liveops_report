@@ -270,6 +270,7 @@ async function buildReport(lang) {
       + block(L.storeBlock, STORE.col, STORE.bg, storeInner)
       + (loungeInner ? block(L.loungeBlock, LOUNGE.col, LOUNGE.bg, loungeInner) : '') + linkbox + foot);
   }
+  if (process.env.MAIL_SUBJECT_SUFFIX) subject += ' ' + process.env.MAIL_SUBJECT_SUFFIX;   // 재발송 등 제목 접미사
   return { subject, html, attachments, chartPng };
 }
 
