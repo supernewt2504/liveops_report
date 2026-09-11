@@ -335,14 +335,23 @@ async function fetchSheetRanks(url) {
   const cOneGrs = findCol(['OneStore', '원스토어', 'ONE'], GRS);
   const cGalPop = findCol(['Galaxy', '갤럭시'], POP);   // 갤럭시 인기(자동수집 실패 시 보완)
   const cGalGrs = findCol(['Galaxy', '갤럭시'], GRS);
+  // 애플/구글: 스크랩은 차트 상위 100위까지만 잡으므로, 100위 밖은 시트값으로 보완(applyRanks에서 자동수집 null일 때만 적용)
+  const cAppPop = findCol(['Apple', '애플', 'APPLE'], POP);
+  const cAppGrs = findCol(['Apple', '애플', 'APPLE'], GRS);
+  const cGooPop = findCol(['Google', '구글'], POP);
+  const cGooGrs = findCol(['Google', '구글'], GRS);
   const cell = (r, ci) => (ci >= 0 && ci < r.length) ? r[ci] : '';
-  const out = { onestore: {}, galaxy: {} };
+  const out = { onestore: {}, galaxy: {}, apple: {}, google: {} };
   for (const r of rows) {
     const date = normDate(r[0]); if (!date) continue;
     const op = parseRankCell(cell(r, cOnePop)), og = parseRankCell(cell(r, cOneGrs));
     if (op !== undefined || og !== undefined) out.onestore[date] = { popular: op, grossing: og };
     const gp = parseRankCell(cell(r, cGalPop)), gg = parseRankCell(cell(r, cGalGrs));
     if (gp !== undefined || gg !== undefined) out.galaxy[date] = { popular: gp, grossing: gg };
+    const ap = parseRankCell(cell(r, cAppPop)), ag = parseRankCell(cell(r, cAppGrs));
+    if (ap !== undefined || ag !== undefined) out.apple[date] = { popular: ap, grossing: ag };
+    const ggp = parseRankCell(cell(r, cGooPop)), ggg = parseRankCell(cell(r, cGooGrs));
+    if (ggp !== undefined || ggg !== undefined) out.google[date] = { popular: ggp, grossing: ggg };
   }
   return out;
 }
@@ -367,6 +376,17 @@ function applyRanks(db, ranks, targetId) {
     const s = (proj.days[date].stores.galaxy ??= { metricsOnly: true });
     if (v.grossing !== undefined) s.rankGrossing = v.grossing;
     if (v.popular !== undefined && s.rankFree == null) s.rankFree = v.popular;
+  }
+  // 애플·구글: 자동수집(스크랩)이 우선이되 차트 100위 밖은 null → 그 경우만 시트값으로 보완.
+  for (const key of ['apple', 'google']) {
+    for (const [date, v] of Object.entries(ranks[key] || {})) {
+      if (!v) continue;
+      const day = proj.days[date];
+      if (!day || !day.stores || !day.stores[key]) continue;   // 스냅샷 없는 날은 만들지 않음(리뷰/평점 유실 방지)
+      const s = day.stores[key];
+      if (v.popular !== undefined && s.rankFree == null) s.rankFree = v.popular;
+      if (v.grossing !== undefined && s.rankGrossing == null) s.rankGrossing = v.grossing;
+    }
   }
 }
 // 지표 전용 스토어: 오늘자 스냅샷에 평점 등 기록 (리뷰/순위 없음)
