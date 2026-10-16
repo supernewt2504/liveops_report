@@ -364,6 +364,7 @@ function applyRanks(db, ranks, targetId) {
   // 원스토어: 인기(rankFree)+매출(rankGrossing) — 시트값이 있으면 덮어씀(无=null=순위없음)
   for (const [date, v] of Object.entries(ranks.onestore || {})) {
     if (!v) continue;
+    if (date > TODAY) continue;   // 시트에 미리 채워진 미래 날짜 행은 무시(유령 날짜 방지)
     proj.days[date] ??= { stores: {} };
     const s = (proj.days[date].stores.onestore ??= { metricsOnly: true });
     if (v.popular !== undefined) s.rankFree = v.popular;
@@ -372,6 +373,7 @@ function applyRanks(db, ranks, targetId) {
   // 갤럭시: 매출은 시트, 인기는 자동수집 우선(있으면 유지)·실패 시(클라우드 등) 시트값으로 보완
   for (const [date, v] of Object.entries(ranks.galaxy || {})) {
     if (!v) continue;
+    if (date > TODAY) continue;   // 미래 날짜 행 무시
     proj.days[date] ??= { stores: {} };
     const s = (proj.days[date].stores.galaxy ??= { metricsOnly: true });
     if (v.grossing !== undefined) s.rankGrossing = v.grossing;
@@ -542,6 +544,15 @@ for (const proj of cfg.projects) {
   for (const d of dts) { const s = pdays[d].stores?.onestore; if (s && s.overallScore != null) latest = s.overallScore; }
   if (latest == null) continue;
   for (const d of dts) { const s = pdays[d].stores?.onestore; if (s && s.overallScore == null) s.overallScore = latest; }
+}
+
+// 유령 미래 날짜 정리: 시트 미래 행 등으로 생긴 '오늘 이후' 날짜 스냅샷 제거(리포트 일자 기준 일관화).
+for (const proj of cfg.projects) {
+  const pdays = db.projects[proj.id]?.days;
+  if (!pdays) continue;
+  for (const d of Object.keys(pdays)) {
+    if (d > TODAY) { delete pdays[d]; console.log(`  🧹 [${proj.id}] 미래 날짜 제거: ${d}`); }
+  }
 }
 
 db.meta.lastRun = new Date().toISOString();
