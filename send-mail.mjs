@@ -314,8 +314,8 @@ let sent = 0, failed = 0;
 for (const j of jobs) {
   const r = await buildReport(j.lang);
   try {
-    // 받는사람=발신주소(자기 자신), 실제 수신자는 전부 숨은참조(BCC) → 수령자끼리 목록 비노출
-    await sendOne({ from: `${FROM_NAME[j.lang]} <${user}>`, to: `${FROM_NAME[j.lang]} <${user}>`, bcc: j.to, subject: r.subject, html: r.html, attachments: r.attachments });
+    // 받는사람=undisclosed-recipients(빈 그룹), 실제 수신자는 전부 숨은참조(BCC) → 수령자끼리 비노출 + 발신주소(service@) 수신함엔 미도착
+    await sendOne({ from: `${FROM_NAME[j.lang]} <${user}>`, to: 'undisclosed-recipients:;', bcc: j.to, subject: r.subject, html: r.html, attachments: r.attachments });
     console.log(`✉ [${j.lang}] 발송 완료 → BCC: ${j.to}\n   (${r.subject})`); sent++;
   } catch (e) {
     console.error(`✗ [${j.lang}] 발송 실패: ${e.message}`); failed++;
