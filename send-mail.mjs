@@ -276,7 +276,7 @@ async function buildReport(lang) {
 
 // ================= 발송 =================
 const jobs = [];
-for (const lang of ['ko', 'zh']) if (byLang[lang].length) jobs.push({ lang, to: byLang[lang].join(', ') });
+for (const lang of ['ko', 'zh']) if (byLang[lang].length) jobs.push({ lang, to: byLang[lang].join(', '), list: byLang[lang].slice() });
 
 if (process.env.MAIL_DRYRUN) {
   for (const j of jobs) {
@@ -314,9 +314,12 @@ let sent = 0, failed = 0;
 for (const j of jobs) {
   const r = await buildReport(j.lang);
   try {
-    // 받는사람=undisclosed-recipients(빈 그룹), 실제 수신자는 전부 숨은참조(BCC) → 수령자끼리 비노출 + 발신주소(service@) 수신함엔 미도착
-    await sendOne({ from: `${FROM_NAME[j.lang]} <${user}>`, to: 'undisclosed-recipients:;', bcc: j.to, subject: r.subject, html: r.html, attachments: r.attachments });
-    console.log(`✉ [${j.lang}] 발송 완료 → BCC: ${j.to}\n   (${r.subject})`); sent++;
+    // 받는사람=첫 수신자, 나머지는 숨은참조(BCC). 발신주소(service@)는 받는사람이 아니므로 수신함에 안 들어오고,
+    // 외부 주소(파트너·dreamplay 등)는 BCC로 비노출. (undisclosed-recipients:; 는 Gmail API 발송 실패를 유발 → 폐기)
+    const toAddr = j.list[0];
+    const bccAddr = j.list.slice(1).join(', ');
+    await sendOne({ from: `${FROM_NAME[j.lang]} <${user}>`, to: toAddr, bcc: bccAddr || undefined, subject: r.subject, html: r.html, attachments: r.attachments });
+    console.log(`✉ [${j.lang}] 발송 완료 → To: ${toAddr}${bccAddr ? ' · BCC: ' + bccAddr : ''}\n   (${r.subject})`); sent++;
   } catch (e) {
     console.error(`✗ [${j.lang}] 발송 실패: ${e.message}`); failed++;
   }
